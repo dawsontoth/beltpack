@@ -109,3 +109,64 @@ input:focus-visible { outline: 2px solid var(--live); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ---- talk control ---- */
+
+/* A `display` rule beats the `hidden` attribute, so restore it explicitly —
+   otherwise the talk control shows while disconnected. */
+#talk-wrap[hidden] { display: none; }
+
+#talk-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+#talk {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 0;
+  color: var(--ink-muted);
+  background: color-mix(in srgb, var(--ink-muted) 22%, transparent);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  /* Stops the browser hijacking a press-and-hold as a scroll or a selection,
+     which would otherwise cut a transmission short on touch. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.12s, background 0.2s, color 0.2s;
+}
+
+#talk[data-talking="true"] {
+  background: var(--busy);
+  color: var(--ground);
+}
+
+#talk:active { transform: scale(0.94); }
+#talk:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+#talk-caption {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+#dial[data-state="talking"] {
+  border-color: var(--busy);
+  background: color-mix(in srgb, var(--busy) 16%, transparent);
+}
+
+select {
+  font: inherit;
+  padding: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+#resolved[data-bad="true"] { color: var(--failed); }

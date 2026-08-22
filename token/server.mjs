@@ -70,8 +70,26 @@ function passcodeMatches(supplied) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Passcode-gated on a private VLAN, so any origin is acceptable. Without
+ *  this a page served from a different port than the token service — any
+ *  setup that is not Caddy fronting both — fails with an opaque network
+ *  error that looks like a Wi-Fi problem. */
+function applyCORS(res) {
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET, OPTIONS");
+  res.setHeader("access-control-allow-headers", "X-Beltpack-Passcode");
+  res.setHeader("access-control-max-age", "86400");
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  applyCORS(res);
+
+  // The custom passcode header makes every request preflighted.
+  if (req.method === "OPTIONS") {
+    res.writeHead(204).end();
+    return;
+  }
 
   if (url.pathname === "/healthz") {
     res.writeHead(200, { "content-type": "text/plain" }).end("ok\n");
@@ -101,6 +119,11 @@ const server = createServer((req, res) => {
   console.log(`token: issued for "${identity}"`);
 });
 
-server.listen(Number(TOKEN_PORT), TOKEN_BIND, () => {
-  console.log(`token: listening on ${TOKEN_BIND}:${TOKEN_PORT}, room "${BELTPACK_ROOM}"`);
+// Node binds 0.0.0.0 as IPv4 only, but browsers routinely resolve "localhost"
+// to ::1 first and then fail with a connection refused that reads like the
+// server is down. "::" binds both families.
+const bindAddress = TOKEN_BIND === "0.0.0.0" ? "::" : TOKEN_BIND;
+
+server.listen(Number(TOKEN_PORT), bindAddress, () => {
+  console.log(`token: listening on ${bindAddress}:${TOKEN_PORT}, room "${BELTPACK_ROOM}"`);
 });

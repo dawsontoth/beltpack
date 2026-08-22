@@ -14,6 +14,8 @@ jobs:
       - uses: actions/checkout@v5
       - run: swift build
         working-directory: server
+      - run: swift test
+        working-directory: server
 
   ios:
     name: iOS app
@@ -21,13 +23,29 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: brew install xcodegen
+      - run: cp ios/Local.xcconfig.example ios/Local.xcconfig
       - run: xcodegen generate
         working-directory: ios
       - name: Build
         working-directory: ios
         run: |
-          xcodebuild -project Beltpack.xcodeproj -scheme Beltpack \
-            -destination 'generic/platform=iOS Simulator' \
+          xcodebuild test -project Beltpack.xcodeproj -scheme Beltpack \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO
+
+  mac:
+    name: Mac host app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: cp ios/Local.xcconfig.example ios/Local.xcconfig
+      - run: xcodegen generate
+        working-directory: mac
+      - name: Build
+        working-directory: mac
+        run: |
+          xcodebuild -project BeltpackHost.xcodeproj -scheme BeltpackHost \
             -configuration Debug CODE_SIGNING_ALLOWED=NO build
 
   web:
@@ -41,6 +59,8 @@ jobs:
       - run: npm install
         working-directory: web
       - run: npm run build
+        working-directory: web
+      - run: npm test
         working-directory: web
       - run: node --check token/server.mjs
       - run: bash -n deploy/run.sh

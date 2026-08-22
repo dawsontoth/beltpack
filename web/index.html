@@ -19,6 +19,16 @@
         <p id="detail"></p>
       </div>
 
+      <div id="talk-wrap" hidden>
+        <button id="talk" type="button" data-talking="false" aria-label="Talk">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="40" height="40">
+            <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/>
+            <path fill="currentColor" d="M19 11a7 7 0 0 1-14 0H3a9 9 0 0 0 8 8.94V23h2v-3.06A9 9 0 0 0 21 11Z"/>
+          </svg>
+        </button>
+        <p id="talk-caption">Hold to talk</p>
+      </div>
+
       <button id="join" type="button" data-connected="false">Join comms</button>
 
       <form id="settings">
@@ -28,7 +38,17 @@
         </label>
         <label>
           Comms server
-          <input id="server" type="url" autocomplete="off" placeholder="https://comms.example.org" />
+          <input id="server" type="text" inputmode="url" autocomplete="off"
+                 placeholder="192.168.1.50  or  comms.yourchurch.org" />
+        </label>
+        <p id="resolved" class="hint" data-bad="false"></p>
+        <label>
+          When to transmit
+          <select id="talkMode">
+            <option value="pushToTalk">Push to talk</option>
+            <option value="latch">Latch</option>
+            <option value="open">Open mic</option>
+          </select>
         </label>
         <label>
           Passcode

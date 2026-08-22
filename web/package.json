@@ -8,7 +8,8 @@
   "scripts": {
     "build": "esbuild src/app.js --bundle --format=esm --minify --outfile=dist/app.js",
     "watch": "esbuild src/app.js --bundle --format=esm --outfile=dist/app.js --watch",
-    "serve": "python3 -m http.server 8080"
+    "serve": "python3 -m http.server 8080",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "livekit-client": "^2.22.0"

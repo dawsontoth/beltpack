@@ -31,12 +31,19 @@ server: ## Build the WING bridge (release)
 web: ## Install deps and bundle the PWA
 	cd web && npm install && npm run build
 
+# Both Xcode projects reference this for signing, and it is gitignored so a
+# team id never lands in a public repo. Create it from the example on first
+# use, otherwise a fresh clone fails at xcodegen with a confusing error.
+ios/Local.xcconfig:
+	cp ios/Local.xcconfig.example $@
+	@echo "created ios/Local.xcconfig - set DEVELOPMENT_TEAM in it to build for a device"
+
 .PHONY: ios
-ios: ## Regenerate and open the iOS Xcode project
+ios: ios/Local.xcconfig ## Regenerate and open the iOS Xcode project
 	cd ios && xcodegen generate && open Beltpack.xcodeproj
 
 .PHONY: mac
-mac: ## Build and launch the Mac host app
+mac: ios/Local.xcconfig ## Build and launch the Mac host app
 	cd mac && xcodegen generate
 	cd mac && xcodebuild -project BeltpackHost.xcodeproj -scheme BeltpackHost \
 		-configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
@@ -93,12 +100,12 @@ logs: ## Tail all service logs
 # ---- checks ---------------------------------------------------------------
 
 .PHONY: check
-check: ## Build everything and lint what can be linted
+check: ios/Local.xcconfig ## Build everything and lint what can be linted
 	cd server && swift build
 	cd server && swift test
 	cd ios && xcodegen generate
 	cd mac && xcodegen generate
-	cd web && npm install && npm run build
+	cd web && npm install && npm run build && npm test
 	node --check token/server.mjs
 	bash -n deploy/run.sh
 	@for f in deploy/launchd/*.plist; do plutil -lint "$$f"; done
