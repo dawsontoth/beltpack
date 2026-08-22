@@ -10,6 +10,8 @@ packages:
   LiveKit:
     url: https://github.com/livekit/client-sdk-swift.git
     from: "2.16.0"
+  BeltpackKit:
+    path: ../server
 
 targets:
   Beltpack:
@@ -20,6 +22,10 @@ targets:
     dependencies:
       - package: LiveKit
         product: LiveKit
+      # Shares PairingLink with the Mac side rather than keeping a second
+      # copy that can drift out of agreement about a link's meaning.
+      - package: BeltpackKit
+        product: BeltpackKit
     info:
       path: Info.plist
       properties:
@@ -49,6 +55,11 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         ITSAppUsesNonExemptEncryption: false
+        # Pairing codes open the app directly: beltpack://join?server=…
+        CFBundleURLTypes:
+          - CFBundleURLName: org.beltpack.pairing
+            CFBundleURLSchemes:
+              - beltpack
     settings:
       base:
         MARKETING_VERSION: "0.1.0"

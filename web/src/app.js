@@ -274,13 +274,44 @@ els.talk.addEventListener("pointercancel", () => {
   if (els.talkMode.value === "pushToTalk") stopTalking();
 });
 
+/** Applies a scanned pairing link, then scrubs it from the address bar so the
+ *  passcode does not sit in history or get shared with a screenshot. Applied
+ *  whole or not at all, matching PairingLink on the native side. */
+function applyPairingLink() {
+  const params = new URLSearchParams(location.search);
+  const server = params.get("server");
+  const passcode = params.get("passcode");
+  if (!server || !passcode) return false;
+
+  els.server.value = server;
+  els.passcode.value = passcode;
+  const identity = params.get("identity");
+  if (identity) els.identity.value = identity;
+  saveSettings();
+
+  history.replaceState(null, "", location.pathname);
+  return true;
+}
+
 const saved = loadSettings();
 els.server.value = saved.server ?? "";
 els.identity.value = saved.identity ?? "";
 els.passcode.value = saved.passcode ?? "";
 els.talkMode.value = saved.talkMode ?? "pushToTalk";
+
+const paired = applyPairingLink();
 renderResolved();
 setState("idle", "Not connected");
+
+if (paired) {
+  // A scanned code should not also require finding the join button, but the
+  // name is still needed and browsers want a gesture before playing audio.
+  setState(
+    "idle",
+    els.identity.value ? "Paired — tap to join" : "Paired — add your position",
+    "Server and passcode came from the code you scanned.",
+  );
+}
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => {

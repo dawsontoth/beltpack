@@ -59,6 +59,10 @@ mac-logs: ## Follow the Mac app's diagnostics
 devices: ## List Core Audio inputs this Mac can see
 	cd server && swift run BeltpackBridge --devices
 
+.PHONY: pair
+pair: ## Show a pairing code for a volunteer to scan
+	./deploy/run.sh pair
+
 .PHONY: run-livekit
 run-livekit: ## Run the SFU in the foreground
 	./deploy/run.sh livekit

@@ -21,11 +21,63 @@ struct BeltpackBridge {
             return
         }
 
+        if CommandLine.arguments.contains("--pair") {
+            printPairingCode()
+            return
+        }
+
         do {
             try await run()
         } catch {
             FileHandle.standardError.write(Data("beltpack-bridge: \(error.localizedDescription)\n".utf8))
             exit(1)
+        }
+    }
+
+    /// Prints a scannable pairing code so nobody types a server address or a
+    /// passcode into a phone by hand.
+    private static func printPairingCode() {
+        let config: Config
+        do {
+            config = try Config.fromEnvironment()
+        } catch {
+            FileHandle.standardError.write(Data("beltpack-bridge: \(error.localizedDescription)\n".utf8))
+            exit(1)
+        }
+
+        guard let clientURL = config.clientURL, let passcode = config.passcode else {
+            FileHandle.standardError.write(Data("""
+            Set BELTPACK_CLIENT_URL and BELTPACK_PASSCODE in .env to build a pairing code.
+            `scripts/setup.sh --lan` fills the first one in for you.
+
+            """.utf8))
+            exit(1)
+        }
+
+        let link = PairingLink(server: clientURL, passcode: passcode)
+        let wantsWeb = CommandLine.arguments.contains("--web")
+
+        // Two forms, because one code cannot serve both platforms: the app
+        // scheme opens the iOS app, the https form opens the web client.
+        guard let url = wantsWeb ? link.webURL : link.appURL,
+              let matrix = QRCode.matrix(for: url.absoluteString)
+        else {
+            FileHandle.standardError.write(Data("beltpack-bridge: could not build a pairing code\n".utf8))
+            exit(1)
+        }
+
+        print()
+        print(wantsWeb ? "  Android and laptops — scan or open:" : "  iPhone — scan with the camera:")
+        print()
+        print(QRCode.terminalRendering(matrix))
+        print("  \(url.absoluteString)")
+        print()
+        print("  This code contains the passcode. Treat a printed one as a key:")
+        print("  anyone who photographs it is on comms.")
+        print()
+        if !wantsWeb {
+            print("  For Android, run: beltpack-bridge --pair --web")
+            print()
         }
     }
 

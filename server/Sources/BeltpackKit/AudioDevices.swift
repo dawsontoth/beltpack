@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import CoreAudio
 import Foundation
 
@@ -204,3 +206,5 @@ public enum AudioDeviceError: LocalizedError {
         }
     }
 }
+
+#endif

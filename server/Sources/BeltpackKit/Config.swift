@@ -18,6 +18,13 @@ public struct Config: Sendable {
     /// mics back into the console. Listen-only builds leave this false.
     public let subscribes: Bool
 
+    /// What a phone should be pointed at — the address serving the token
+    /// endpoint. Only needed to build pairing codes, so it is optional.
+    public let clientURL: String?
+
+    /// The shared join passcode, carried inside a pairing code.
+    public let passcode: String?
+
     /// Where the summed phone audio goes back out. Only used when
     /// `subscribes` is true; route it to the WING channel feeding Bus 1.
     public let outputDeviceHint: String?
@@ -53,6 +60,8 @@ public struct Config: Sendable {
             identity: env["BELTPACK_IDENTITY"] ?? "wing-bridge",
             inputDeviceHint: try required("BELTPACK_INPUT_DEVICE"),
             subscribes: (env["BELTPACK_SUBSCRIBE"] ?? "false") == "true",
+            clientURL: env["BELTPACK_CLIENT_URL"].flatMap { $0.isEmpty ? nil : $0 },
+            passcode: env["BELTPACK_PASSCODE"].flatMap { $0.isEmpty ? nil : $0 },
             outputDeviceHint: env["BELTPACK_OUTPUT_DEVICE"].flatMap { $0.isEmpty ? nil : $0 },
         )
     }

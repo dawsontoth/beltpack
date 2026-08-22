@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import Foundation
 import LiveKit
 import OSLog
@@ -207,3 +209,5 @@ extension BridgeController: RoomDelegate {
         }
     }
 }
+
+#endif

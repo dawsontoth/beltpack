@@ -83,6 +83,16 @@ final class HostModel: ObservableObject {
         }
     }
 
+    /// Nil until .env carries both halves; the pairing button hides rather
+    /// than offering a code that would not work.
+    var pairingLink: PairingLink? {
+        guard let config = controller.config,
+              let server = config.clientURL,
+              let passcode = config.passcode
+        else { return nil }
+        return PairingLink(server: server, passcode: passcode)
+    }
+
     func toggle() async {
         if controller.runState.isRunning {
             await controller.stop()

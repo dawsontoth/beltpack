@@ -233,6 +233,7 @@ if [[ "$MODE" == "dev" ]]; then
     skip "node IP already 127.0.0.1"
   fi
   env_set BELTPACK_PUBLIC_URL "ws://127.0.0.1:7880"
+  env_set BELTPACK_CLIENT_URL "http://127.0.0.1:$(env_get TOKEN_PORT)"
   env_set BELTPACK_BIND "127.0.0.1"
   env_set TOKEN_BIND "127.0.0.1"
 elif [[ "$MODE" == "lan" ]]; then
@@ -241,6 +242,7 @@ elif [[ "$MODE" == "lan" ]]; then
   if LAN_IP="$(detect_lan_ip)"; then
     env_set BELTPACK_NODE_IP "$LAN_IP"
     env_set BELTPACK_PUBLIC_URL "ws://${LAN_IP}:7880"
+    env_set BELTPACK_CLIENT_URL "http://${LAN_IP}:$(env_get TOKEN_PORT)"
     env_set BELTPACK_BIND "0.0.0.0"
     env_set TOKEN_BIND "0.0.0.0"
     did "listening on all interfaces, advertising $LAN_IP"

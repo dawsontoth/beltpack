@@ -107,6 +107,24 @@ make ios           # opens Xcode
 
 `make check` builds everything and lints what can be linted.
 
+## Pairing
+
+Nobody should type a server address or a passcode into a phone. Show a code
+instead:
+
+```bash
+make pair              # iPhone: opens the app via beltpack://
+make pair -- --web     # Android and laptops: opens the web client
+```
+
+The Mac app has the same thing behind its **Pair** button, showing both codes
+side by side.
+
+The passcode travels inside the code, so a printed one is a key: anyone who
+photographs it is on comms. The web client scrubs the pairing parameters out of
+the address bar as soon as it has read them, so the passcode does not linger in
+browser history.
+
 ## The Mac host app
 
 `make mac` builds and launches a SwiftUI front end for the same bridge — device

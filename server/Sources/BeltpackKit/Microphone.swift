@@ -52,6 +52,11 @@ public enum Microphone {
     }
 
     private static func printDeniedGuidance() {
+        #if os(iOS)
+        // On iOS the app has its own identity and Settings entry; there is no
+        // terminal to blame.
+        FileHandle.standardError.write(Data("Microphone access is \(statusDescription).\n".utf8))
+        #else
         // A command-line tool has no bundle identity of its own, so macOS
         // attributes the request to whatever launched it. Grant it there.
         let terminal = ProcessInfo.processInfo.environment["TERM_PROGRAM"] ?? "your terminal"
@@ -68,5 +73,6 @@ public enum Microphone {
         Terminal.app directly rather than from an editor or an agent.
 
         """.utf8))
+        #endif
     }
 }

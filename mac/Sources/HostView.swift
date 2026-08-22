@@ -3,6 +3,7 @@ import SwiftUI
 
 struct HostView: View {
     @EnvironmentObject private var model: HostModel
+    @State private var showingPairing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,6 +36,15 @@ struct HostView: View {
 
             Spacer()
 
+            if model.pairingLink != nil {
+                Button {
+                    showingPairing = true
+                } label: {
+                    Label("Pair", systemImage: "qrcode")
+                }
+                .help("Show a code for a volunteer to scan")
+            }
+
             Button(model.controller.runState.isRunning ? "Stop" : "Start") {
                 Task { await model.toggle() }
             }
@@ -42,6 +52,11 @@ struct HostView: View {
             .disabled(model.controller.runState.isBusy || model.controller.config == nil)
         }
         .padding(20)
+        .sheet(isPresented: $showingPairing) {
+            if let link = model.pairingLink {
+                PairingView(link: link)
+            }
+        }
     }
 
     private var statusTitle: String {

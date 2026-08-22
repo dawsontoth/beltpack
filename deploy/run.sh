@@ -7,7 +7,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SERVICE="${1:?usage: run.sh <livekit|token|bridge>}"
+SERVICE="${1:?usage: run.sh <livekit|token|bridge|pair>}"
 
 if [[ ! -f "$REPO/.env" ]]; then
   echo "run.sh: no $REPO/.env — copy .env.example and fill it in." >&2
@@ -46,6 +46,15 @@ case "$SERVICE" in
       exit 1
     fi
     exec "$BIN"
+    ;;
+  pair)
+    BIN="$REPO/server/.build/release/BeltpackBridge"
+    [[ -x "$BIN" ]] || BIN="$REPO/server/.build/debug/BeltpackBridge"
+    if [[ ! -x "$BIN" ]]; then
+      echo "run.sh: build the bridge first with 'make server'." >&2
+      exit 1
+    fi
+    exec "$BIN" --pair "${@:2}"
     ;;
   *)
     echo "run.sh: unknown service '$SERVICE'" >&2

@@ -1,3 +1,4 @@
+import BeltpackKit
 import LiveKit
 import SwiftUI
 
@@ -9,6 +10,19 @@ struct BeltpackApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(comms)
+                .onOpenURL { url in
+                    // A scanned pairing code. Applied whole or not at all:
+                    // PairingLink refuses anything half-configured.
+                    guard let link = PairingLink.parse(url) else { return }
+                    Settings.serverURL = link.server
+                    Settings.passcode = link.passcode
+                    if let identity = link.identity, !identity.isEmpty {
+                        Settings.identity = identity
+                    }
+                    Task {
+                        if Settings.isConfigured { await comms.connect() }
+                    }
+                }
                 .task {
                     #if DEBUG
                     // Smoke-test hook: `simctl launch … -beltpack-autoconnect`

@@ -5,7 +5,10 @@ import PackageDescription
 let package = Package(
     name: "BeltpackKit",
     platforms: [
+        // iOS too: the app shares PairingLink and the token plumbing rather
+        // than keeping a second copy that can drift.
         .macOS(.v14),
+        .iOS(.v17),
     ],
     products: [
         // Shared by the headless bridge and the Mac app, so the two can never
