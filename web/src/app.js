@@ -29,6 +29,9 @@ const els = {
 const room = new Room({ adaptiveStream: false, dynacast: false });
 let connected = false;
 let talking = false;
+let armed = false;
+
+const NEEDS_MIC = (mode) => mode !== "listenOnly";
 
 function loadSettings() {
   try {
@@ -89,7 +92,7 @@ function renderResolved() {
 
 function renderTalk() {
   const mode = els.talkMode.value;
-  els.talkWrap.hidden = !connected || mode === "open";
+  els.talkWrap.hidden = !connected || mode === "open" || !NEEDS_MIC(mode);
   els.talk.dataset.talking = String(talking);
   els.talkCaption.textContent =
     mode === "pushToTalk"
@@ -130,6 +133,11 @@ async function join() {
     await room.connect(url, token);
     connected = true;
     setState("listening", "On comms", describeRoom());
+
+    // Arm now, not on the first press. The first setMicrophoneEnabled has to
+    // run getUserMedia and negotiate a publish; every later one is just a
+    // mute, because stopMicTrackOnMute defaults to false.
+    if (NEEDS_MIC(settings.talkMode)) await armMicrophone();
     if (settings.talkMode === "open") await startTalking();
   } catch (error) {
     connected = false;
@@ -143,14 +151,14 @@ async function join() {
 }
 
 async function leave() {
-  await stopTalking();
+  await disarmMicrophone();
   await room.disconnect();
   connected = false;
   setState("idle", "Not connected");
 }
 
-async function startTalking() {
-  if (!connected || talking) return;
+async function armMicrophone() {
+  if (armed) return;
   try {
     // A voice in a loud room, unlike the console feed: leave the browser's
     // echo cancellation and noise suppression switched on.
@@ -159,7 +167,33 @@ async function startTalking() {
       noiseSuppression: true,
       autoGainControl: true,
     });
+    await room.localParticipant.setMicrophoneEnabled(false);
+    armed = true;
+  } catch (error) {
+    setState("failed", "Microphone blocked", error.message);
+  }
+}
+
+async function disarmMicrophone() {
+  if (!armed) return;
+  armed = false;
+  talking = false;
+  try {
+    await room.localParticipant.setMicrophoneEnabled(false);
+  } catch {
+    // Leaving the room takes the track with it either way.
+  }
+}
+
+async function startTalking() {
+  if (!connected || talking) return;
+  if (!armed) await armMicrophone();
+  if (!armed) return;
+  const started = performance.now();
+  try {
+    await room.localParticipant.setMicrophoneEnabled(true);
     talking = true;
+    console.info(`beltpack: talk started in ${Math.round(performance.now() - started)}ms`);
     setState("listening", "On comms");
   } catch (error) {
     setState("failed", "Microphone blocked", error.message);
@@ -213,8 +247,15 @@ els.form.addEventListener("submit", (event) => {
 els.server.addEventListener("input", renderResolved);
 els.talkMode.addEventListener("change", async () => {
   saveSettings();
-  if (els.talkMode.value === "open" && connected) await startTalking();
-  else if (talking) await stopTalking();
+  const mode = els.talkMode.value;
+  if (connected) {
+    if (!NEEDS_MIC(mode)) await disarmMicrophone();
+    else {
+      await armMicrophone();
+      if (mode === "open") await startTalking();
+      else if (talking) await stopTalking();
+    }
+  }
   renderTalk();
 });
 

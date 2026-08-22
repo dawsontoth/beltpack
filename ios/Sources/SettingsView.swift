@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var comms: CommsClient
 
     @State private var serverURL = Settings.serverURL
     @State private var identity = Settings.identity
@@ -69,6 +70,9 @@ struct SettingsView: View {
                         Settings.micMode = micMode
                         Settings.talkMode = talkMode
                         dismiss()
+                        // Apply immediately: someone switching mode
+                        // mid-service should not have to rejoin.
+                        Task { await comms.applyTalkModeChange() }
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {

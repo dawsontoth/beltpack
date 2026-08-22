@@ -46,9 +46,19 @@ console, a self-hosted LiveKit, and an iPhone on Wi-Fi with Bluetooth earbuds:
 
 ## Talking
 
-Three talk modes, set per phone: hold to talk, tap to latch, or leave the mic
-open. Push-to-talk is the default, because ten open mics in a sanctuary is a
-different kind of problem.
+Four talk modes, set per phone: listen only, hold to talk, tap to latch, or
+leave the mic open. Push-to-talk is the default, because ten open mics in a
+sanctuary is a different kind of problem.
+
+The microphone is armed when you join, not when you first press: the track is
+published already muted, so pressing talk is a local unmute rather than an
+audio-session switch, a track creation and a publish negotiation. That matters
+because the session switch is what drags Bluetooth from A2DP to HFP, which
+takes well over a second on real earbuds — an unacceptable delay on a cue.
+
+The cost of arming is that the earbuds sit in hands-free mode for the whole
+service rather than only while you talk. **Listen only** is the mode for anyone
+who never talks: it never arms, so Bluetooth stays in A2DP at full quality.
 
 Two microphone modes, and the choice is a real trade rather than a preference.
 Asking iOS for the **headset mic** forces Bluetooth into hands-free mode: both

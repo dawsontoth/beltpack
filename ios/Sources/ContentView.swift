@@ -10,7 +10,7 @@ struct ContentView: View {
                 Spacer()
                 StatusDial(state: comms.state, isTalking: comms.isTalking)
                 statusText
-                if isConnected, Settings.talkMode != .open {
+                if isConnected, Settings.talkMode.needsMicrophone, Settings.talkMode != .open {
                     TalkButton(
                         mode: Settings.talkMode,
                         isTalking: comms.isTalking,
@@ -176,6 +176,7 @@ private struct TalkButton: View {
 
     private var caption: String {
         switch mode {
+        case .listenOnly: "Listening"
         case .pushToTalk: isTalking ? "Release to stop" : "Hold to talk"
         case .latch: isTalking ? "Tap to stop" : "Tap to talk"
         case .open: "Mic open"
@@ -198,7 +199,7 @@ private struct TalkButton: View {
                 switch mode {
                 case .pushToTalk: onRelease()
                 case .latch: onToggle()
-                case .open: break
+                case .open, .listenOnly: break
                 }
             }
     }

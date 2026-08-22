@@ -2,6 +2,7 @@ import AVFAudio
 import Combine
 import Foundation
 import LiveKit
+import OSLog
 
 /// Joins the comms room and keeps listening while the phone is in a pocket.
 ///
@@ -23,6 +24,11 @@ final class CommsClient: ObservableObject {
     @Published private(set) var isTalking = false
     @Published private(set) var micDenied = false
 
+    // Read with Console.app, or:
+    //   log stream --device --predicate 'subsystem == "org.beltpack"'
+    private let log = Logger(subsystem: "org.beltpack", category: "comms")
+
+    private var micTrack: LocalAudioTrack?
     private var micPublication: LocalTrackPublication?
 
     private let room = Room()
@@ -53,6 +59,15 @@ final class CommsClient: ObservableObject {
                 roomOptions: RoomOptions(adaptiveStream: false, dynacast: false),
             )
             state = .listening
+
+            // Arm the microphone now, not on the first press. Creating the
+            // track, switching the audio session, and negotiating the publish
+            // all cost time, and the session switch drags Bluetooth from A2DP
+            // to HFP — well over a second on real earbuds. Doing it here means
+            // a press is only ever an unmute.
+            if Settings.talkMode.needsMicrophone {
+                await armMicrophone()
+            }
             if Settings.talkMode == .open {
                 await startTalking()
             }
@@ -66,7 +81,7 @@ final class CommsClient: ObservableObject {
     }
 
     func disconnect() async {
-        await stopTalking()
+        await disarmMicrophone()
         await room.disconnect()
         state = .idle
         talkers = []
@@ -104,8 +119,10 @@ final class CommsClient: ObservableObject {
 
     // MARK: - Talking
 
-    func startTalking() async {
-        guard case .listening = state, micPublication == nil else { return }
+    /// Publishes the microphone already muted, so pressing talk is a local
+    /// unmute rather than a track negotiation.
+    private func armMicrophone() async {
+        guard micPublication == nil else { return }
 
         guard await AVAudioApplication.requestRecordPermission() else {
             micDenied = true
@@ -126,25 +143,68 @@ final class CommsClient: ObservableObject {
                     noiseSuppression: true,
                 ),
             )
+            // Muted before it is published, so nothing escapes in the gap
+            // between publishing and the first mute.
+            try await track.mute()
+            let armStart = Date()
             micPublication = try await room.localParticipant.publish(audioTrack: track)
-            isTalking = true
+            micTrack = track
+            // The expensive part, paid once at connect rather than per press.
+            log.notice("microphone armed in \(Int(Date().timeIntervalSince(armStart) * 1000))ms")
         } catch {
             state = .failed(error.localizedDescription)
             try? configureAudioSession(forTalking: false)
         }
     }
 
-    func stopTalking() async {
-        guard let publication = micPublication else { return }
+    private func disarmMicrophone() async {
+        if let publication = micPublication {
+            try? await room.localParticipant.unpublish(publication: publication)
+        }
         micPublication = nil
+        micTrack = nil
         isTalking = false
-        try? await room.localParticipant.unpublish(publication: publication)
-        // Back to .playback so the earbuds return to full-bandwidth listening.
-        try? configureAudioSession(forTalking: false)
+    }
+
+    func startTalking() async {
+        guard case .listening = state, !isTalking else { return }
+
+        // Arming should have happened at connect; this only covers someone
+        // switching out of listen-only mid-service.
+        if micTrack == nil { await armMicrophone() }
+        guard let track = micTrack else { return }
+
+        do {
+            let started = Date()
+            try await track.unmute()
+            isTalking = true
+            log.notice("talk started in \(Int(Date().timeIntervalSince(started) * 1000))ms")
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+    }
+
+    func stopTalking() async {
+        guard isTalking, let track = micTrack else { return }
+        isTalking = false
+        try? await track.mute()
     }
 
     func toggleTalking() async {
         if isTalking { await stopTalking() } else { await startTalking() }
+    }
+
+    /// Called when the talk mode changes while connected.
+    func applyTalkModeChange() async {
+        if Settings.talkMode.needsMicrophone {
+            await armMicrophone()
+            if Settings.talkMode == .open { await startTalking() }
+            else if isTalking { await stopTalking() }
+        } else {
+            await disarmMicrophone()
+            // Back to .playback so the earbuds return to full-bandwidth audio.
+            try? configureAudioSession(forTalking: false)
+        }
     }
 }
 
