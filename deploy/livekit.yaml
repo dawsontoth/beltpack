@@ -18,14 +18,14 @@ rtc:
   udp_port: 7882
   # This is a private LAN. Do not go looking for a public address.
   use_external_ip: false
-  # REQUIRED: the booth Mac's LAN address on the comms VLAN. Phones connect
-  # their media straight here, bypassing Caddy.
-  node_ip: 192.168.10.10
 
-# Generate real values with: livekit-server generate-keys
-# Then put the same pair in .env — never commit them.
-keys:
-  devkey: REPLACE-WITH-A-SECRET-OF-AT-LEAST-32-CHARACTERS
+# Deliberately absent from this file, because it is committed to a public repo:
+#
+#   keys     -> supplied as LIVEKIT_KEYS by deploy/run.sh, built from
+#               LIVEKIT_API_KEY and LIVEKIT_API_SECRET in .env
+#   node_ip  -> supplied as NODE_IP by deploy/run.sh, from BELTPACK_NODE_IP
+#
+# Keep it that way. Nothing secret and nothing site-specific belongs here.
 
 logging:
   level: info

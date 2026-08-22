@@ -23,6 +23,14 @@ mkdir -p "$REPO/logs"
 
 case "$SERVICE" in
   livekit)
+    # Secrets and the LAN address are injected here rather than living in
+    # deploy/livekit.yaml, which is committed to a public repo.
+    export LIVEKIT_KEYS="${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    if [[ -z "${BELTPACK_NODE_IP:-}" ]]; then
+      echo "run.sh: set BELTPACK_NODE_IP in .env to the LAN address of this Mac on the comms VLAN." >&2
+      exit 1
+    fi
+    export NODE_IP="$BELTPACK_NODE_IP"
     exec livekit-server --config "$REPO/deploy/livekit.yaml"
     ;;
   token)

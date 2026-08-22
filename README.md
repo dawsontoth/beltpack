@@ -68,6 +68,11 @@ and confirm the name appears. This is also why the services install as
 **LaunchAgents** rather than LaunchDaemons — a daemon has no login session to
 prompt in.
 
+**Nothing secret goes in `deploy/livekit.yaml`.** It is a tracked file in a
+public repo. Keys and the Mac's LAN address are injected by `deploy/run.sh`
+from `.env` as `LIVEKIT_KEYS` and `NODE_IP`. If you find yourself editing
+credentials into a committed file, stop.
+
 **The web client needs a real certificate.** Browsers refuse WebRTC and service
 workers outside a secure context, and a bare LAN IP is not one. Point a real
 hostname's A record at the Mac's private address and let Caddy get a Let's
