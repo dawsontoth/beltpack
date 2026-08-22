@@ -25,8 +25,44 @@ board TB ─────┴──►  W I N G  ──────┤
   a quarter-second late and it is unusable.
 * Both buses ride the one USB cable already connecting the Mac to the WING.
 
-Phase 1 is listen-only. Phase 2 adds push-to-talk, summed back into a single
-WING input channel that routes to Bus 1 **only**.
+Talking is off by default and gated in two places: `BELTPACK_CAN_PUBLISH`
+decides whether beltpacks may publish at all, and `BELTPACK_SUBSCRIBE` decides
+whether the bridge listens for them and returns the sum to the console. Turn on
+both for full duplex; leave both off for listen-only.
+
+## Status
+
+Verified end to end on real hardware — a USB microphone standing in for the
+console, a self-hosted LiveKit, and an iPhone on Wi-Fi with Bluetooth earbuds:
+
+| | |
+|---|---|
+| Console &rarr; phone | working, latency good with earbuds |
+| Phone &rarr; console | working, latency good |
+| Push to talk / latch / open | working |
+| Real WING over USB | **untested** — no console on hand |
+| TLS via Caddy | **untested** — bench testing has run without it |
+| TestFlight distribution | not set up |
+
+## Talking
+
+Three talk modes, set per phone: hold to talk, tap to latch, or leave the mic
+open. Push-to-talk is the default, because ten open mics in a sanctuary is a
+different kind of problem.
+
+Two microphone modes, and the choice is a real trade rather than a preference.
+Asking iOS for the **headset mic** forces Bluetooth into hands-free mode: both
+directions drop to 16 kHz mono, the console feed included, in exchange for
+roughly 30 ms of latency and the use of both hands. The **phone mic** keeps the
+earbuds in A2DP/AAC at full bandwidth, but you hold the handset to talk.
+
+Headset is the default. On comms a cue heard sooner beats a cue heard in higher
+fidelity, and a camera operator needs their hands.
+
+Note the asymmetry in audio processing, which is deliberate: the talk track has
+echo cancellation, noise suppression and AGC **on**; the console feed has all
+three **off**. One is a voice in a loud room, the other is a finished mix, and
+the processing that rescues the first wrecks the second.
 
 ## Layout
 
