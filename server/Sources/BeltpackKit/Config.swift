@@ -25,6 +25,12 @@ public struct Config: Sendable {
     /// The shared join passcode, carried inside a pairing code.
     public let passcode: String?
 
+    /// Gates the management page. Deliberately separate from the join
+    /// passcode: that one is printed on QR codes and handed to volunteers,
+    /// while this one can re-patch what the console is capturing.
+    public let adminPasscode: String?
+    public let adminPort: UInt16
+
     /// Where the summed phone audio goes back out. Only used when
     /// `subscribes` is true; route it to the WING channel feeding Bus 1.
     public let outputDeviceHint: String?
@@ -62,6 +68,8 @@ public struct Config: Sendable {
             subscribes: (env["BELTPACK_SUBSCRIBE"] ?? "false") == "true",
             clientURL: env["BELTPACK_CLIENT_URL"].flatMap { $0.isEmpty ? nil : $0 },
             passcode: env["BELTPACK_PASSCODE"].flatMap { $0.isEmpty ? nil : $0 },
+            adminPasscode: env["BELTPACK_ADMIN_PASSCODE"].flatMap { $0.isEmpty ? nil : $0 },
+            adminPort: UInt16(env["BELTPACK_ADMIN_PORT"] ?? "") ?? 7884,
             outputDeviceHint: env["BELTPACK_OUTPUT_DEVICE"].flatMap { $0.isEmpty ? nil : $0 },
         )
     }

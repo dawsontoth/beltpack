@@ -125,25 +125,38 @@ photographs it is on comms. The web client scrubs the pairing parameters out of
 the address bar as soon as it has read them, so the passcode does not linger in
 browser history.
 
-## The Mac host app
+## The management page
 
-`make mac` builds and launches a SwiftUI front end for the same bridge — device
-pickers with channel counts, live participant list with mute and speaking
-state, and start/stop, plus a menu bar item for glancing at it mid-service.
+The tension between a native app and a command line resolves once you notice
+that only one part is actually constrained: **audio capture has to happen in a
+native process with a microphone grant, and everything else is just state an
+operator wants to see and change.**
 
-Prefer it to the CLI on the booth Mac, for a reason beyond convenience: a
-bundled app has its own TCC identity, so the microphone prompt is attributed to
-Beltpack itself. A bare CLI binary has no identity of its own and its prompt is
-attributed to whatever terminal launched it, which is why the headless bridge
-needs its permission granted against your terminal app.
-
-It reads the same `.env` as everything else — looking in the obvious places
-first, with a file picker if it guesses wrong. Diagnostics go to the unified
-log rather than stdout, since a bundled app has nowhere to print:
+So the host is a background app bundle — `LSUIElement`, a menu bar item, no
+window — that serves a management page on the comms VLAN:
 
 ```bash
-make mac-logs
+make mac       # build and launch the host
+make admin     # open the page
 ```
+
+Status, device re-patching, who is on comms with live mute and speaking state,
+start/stop, and pairing codes. Because it is a web page, you drive the booth Mac
+from a phone at the back of the room rather than from its keyboard — which is
+what makes pairing practical: pull it up, hold it out, the volunteer scans it.
+
+Being an app bundle is not cosmetic. A bundle carries its own TCC identity, so
+the microphone prompt is attributed to Beltpack. A bare CLI binary has none and
+its prompt lands on whatever terminal launched it, which is exactly why the
+prompt never appeared during setup.
+
+The management passcode is deliberately separate from the join passcode:
+the join one is printed on QR codes and handed round, while this one can
+re-patch what the console is capturing. `setup.sh` generates both.
+
+The CLI bridge stays for scripting and CI. It keeps its own room rather than
+sharing the app's controller — that type is `@MainActor`, and a command-line
+process has no app run loop.
 
 ## Three things that will bite you
 
@@ -224,6 +237,7 @@ monitoring themselves.
 | 7881 | LiveKit RTC over TCP (fallback) |
 | 7882 | LiveKit RTC over UDP (where audio actually flows) |
 | 7883 | Token service (loopback) |
+| 7884 | Management page |
 
 ## License
 

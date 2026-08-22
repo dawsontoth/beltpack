@@ -11,6 +11,7 @@ final class HostModel: ObservableObject {
     @Published private(set) var configError: String?
 
     let controller = BridgeController()
+    private var control: ControlServer?
 
     private var cancellables: Set<AnyCancellable> = []
     private static let envPathKey = "beltpack.envPath"
@@ -23,6 +24,37 @@ final class HostModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
         loadConfig()
+        startControlServer()
+
+        // A booth machine is meant to come up on its own after a power cut;
+        // waiting for someone to press Start defeats the point.
+        if controller.config != nil {
+            Task { await controller.start() }
+        }
+    }
+
+    /// Serves the management page. Without a passcode there is nothing to
+    /// gate it with, so it stays off rather than opening unauthenticated
+    /// control of the console to the whole VLAN.
+    private func startControlServer() {
+        guard let config = controller.config else { return }
+        guard let passcode = config.adminPasscode, passcode.count >= 8 else {
+            configError = "Set BELTPACK_ADMIN_PASSCODE (8+ characters) to enable the control panel."
+            return
+        }
+
+        let server = ControlServer(port: config.adminPort, passcode: passcode, controller: controller)
+        do {
+            try server.start()
+            control = server
+        } catch {
+            configError = "Control panel could not start: \(error.localizedDescription)"
+        }
+    }
+
+    var adminURL: URL? {
+        guard control != nil, let port = controller.config?.adminPort else { return nil }
+        return URL(string: "http://127.0.0.1:\(port)/")
     }
 
     /// Try the obvious places before asking. Most people run this from a
@@ -104,7 +136,7 @@ final class HostModel: ObservableObject {
     var menuBarSymbol: String {
         switch controller.runState {
         case .running: "dot.radiowaves.left.and.right"
-        case .starting: "ellipsis"
+        case .starting, .reconnecting: "ellipsis"
         case .failed: "exclamationmark.triangle"
         case .stopped: "pause"
         }
@@ -116,6 +148,7 @@ final class HostModel: ObservableObject {
             let others = controller.participants.filter { !$0.isBridge }.count
             return others == 1 ? "On air, 1 beltpack" : "On air, \(others) beltpacks"
         case .starting: return "Starting…"
+        case .reconnecting: return "Reconnecting…"
         case let .failed(message): return "Failed: \(message)"
         case .stopped: return "Stopped"
         }

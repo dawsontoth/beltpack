@@ -207,6 +207,19 @@ else
   skip "passcode already set"
 fi
 
+# ---- 4b. admin passcode ---------------------------------------------------
+
+step "Management passcode"
+
+if is_placeholder "$(env_get BELTPACK_ADMIN_PASSCODE)"; then
+  ADMIN="$(set +o pipefail; LC_ALL=C tr -dc 'abcdefghijkmnpqrstuvwxyz23456789' < /dev/urandom | head -c 14)"
+  env_set BELTPACK_ADMIN_PASSCODE "$ADMIN"
+  did "generated management passcode: ${BOLD}${ADMIN}${RESET}"
+  warn "this one is not on the QR codes — it can re-patch the console"
+else
+  skip "management passcode already set"
+fi
+
 # ---- 5. network address ---------------------------------------------------
 
 step "Network address"

@@ -42,6 +42,11 @@ ios/Local.xcconfig:
 ios: ios/Local.xcconfig ## Regenerate and open the iOS Xcode project
 	cd ios && xcodegen generate && open Beltpack.xcodeproj
 
+.PHONY: admin
+admin: ## Open the management page
+	@open "http://127.0.0.1:$$(grep '^BELTPACK_ADMIN_PORT' .env | sed -E 's/.*="(.*)"/\1/')/" \
+		|| echo "start the host first: make mac"
+
 .PHONY: mac
 mac: ios/Local.xcconfig ## Build and launch the Mac host app
 	cd mac && xcodegen generate
@@ -80,18 +85,18 @@ run-bridge: server ## Run the WING bridge in the foreground
 .PHONY: install-agents
 install-agents: ## Install LaunchAgents pointed at this checkout
 	@mkdir -p $(AGENTS) logs
-	@for svc in livekit token bridge; do \
+	@for svc in livekit token host; do \
 		sed 's|REPO|$(REPO)|g' deploy/launchd/org.beltpack.$$svc.plist \
 			> $(AGENTS)/org.beltpack.$$svc.plist; \
 		echo "installed $(AGENTS)/org.beltpack.$$svc.plist"; \
 	done
 	@echo
 	@echo "Now load them:"
-	@echo "  for s in livekit token bridge; do launchctl bootstrap gui/\$$(id -u) $(AGENTS)/org.beltpack.\$$s.plist; done"
+	@echo "  for s in livekit token host; do launchctl bootstrap gui/\$$(id -u) $(AGENTS)/org.beltpack.\$$s.plist; done"
 
 .PHONY: uninstall-agents
 uninstall-agents: ## Unload and remove the LaunchAgents
-	@for svc in livekit token bridge; do \
+	@for svc in livekit token host; do \
 		launchctl bootout gui/$$(id -u)/org.beltpack.$$svc 2>/dev/null || true; \
 		rm -f $(AGENTS)/org.beltpack.$$svc.plist; \
 	done

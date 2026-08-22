@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  WING audio bridge.
+  The host: audio bridge, menu bar item, and management page.
+
+  Launched as the app bundle's executable rather than the CLI, because a
+  bundle carries its own TCC identity. A bare command-line binary has none,
+  so its microphone prompt lands on whatever terminal started it — which is
+  why the prompt never appeared during setup.
 
   A LaunchAgent, not a LaunchDaemon, and deliberately so: capturing the WING
   counts as microphone access under TCC, and a daemon has no login session to
@@ -13,12 +18,11 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>org.beltpack.bridge</string>
+  <string>org.beltpack.host</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>REPO/deploy/run.sh</string>
-    <string>bridge</string>
+    <string>REPO/mac/build/Build/Products/Debug/BeltpackHost.app/Contents/MacOS/BeltpackHost</string>
   </array>
 
   <key>WorkingDirectory</key>

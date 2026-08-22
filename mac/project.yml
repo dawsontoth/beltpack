@@ -31,6 +31,11 @@ targets:
           Beltpack Host captures the console feed from your audio interface.
         # A booth machine, not a document editor.
         LSApplicationCategoryType: public.app-category.utilities
+        # No dock icon: this is a booth daemon with a menu bar item, not an
+        # app somebody switches to. Still a real bundle, so it keeps its own
+        # TCC identity — the reason the microphone prompt works here and not
+        # for a bare CLI binary.
+        LSUIElement: true
     settings:
       base:
         MARKETING_VERSION: "0.1.0"

@@ -51,6 +51,27 @@ public enum QRCode {
             .createCGImage(scaled, from: scaled.extent)
     }
 
+    /// An SVG of the code, for embedding in a page without encoding an image
+    /// or shipping a JavaScript QR library to the browser.
+    public static func svg(for text: String, quietZone: Int = 3) -> String? {
+        guard let matrix = matrix(for: text) else { return nil }
+        let size = matrix.count + quietZone * 2
+
+        var paths = ""
+        for (y, row) in matrix.enumerated() {
+            for (x, dark) in row.enumerated() where dark {
+                paths += "M\(x + quietZone) \(y + quietZone)h1v1h-1z"
+            }
+        }
+
+        return """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 \(size) \(size)" \
+        shape-rendering="crispEdges" role="img" aria-label="Pairing code">\
+        <rect width="\(size)" height="\(size)" fill="#fff"/>\
+        <path d="\(paths)" fill="#000"/></svg>
+        """
+    }
+
     /// Renders to text using half-block characters, two module rows per line,
     /// so a code fits in a terminal window and survives an SSH session.
     ///
