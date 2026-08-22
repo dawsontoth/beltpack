@@ -37,9 +37,7 @@ struct ContentView: View {
         case .listening:
             VStack(spacing: 6) {
                 Text("On comms").font(.headline)
-                Text(comms.talkers.isEmpty
-                    ? "Waiting for the console"
-                    : "\(comms.talkers.count) other position\(comms.talkers.count == 1 ? "" : "s")")
+                Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -69,6 +67,18 @@ struct ContentView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(isConnected ? .red : .accentColor)
+    }
+
+    /// What a camera op actually wants to know at a glance: is the console
+    /// feed live, and who else is on.
+    private var detail: String {
+        let others = comms.talkers.count - (comms.consoleIsLive ? 1 : 0)
+        switch (comms.consoleIsLive, others) {
+        case (false, _): return "Waiting for the console"
+        case (true, 0): return "Console live"
+        case (true, 1): return "Console live \u{00B7} 1 other position"
+        case let (true, n): return "Console live \u{00B7} \(n) other positions"
+        }
     }
 
     private var isConnected: Bool {

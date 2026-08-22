@@ -19,6 +19,7 @@ final class CommsClient: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var talkers: [String] = []
+    @Published private(set) var consoleIsLive = false
 
     private let room = Room()
     private var listenerTask: Task<Void, Never>?
@@ -48,6 +49,10 @@ final class CommsClient: ObservableObject {
                 roomOptions: RoomOptions(adaptiveStream: false, dynacast: false),
             )
             state = .listening
+            // The bridge is normally already in the room when a beltpack
+            // joins, so no participantDidConnect fires for it. Seed from
+            // current state or the UI claims nothing is there.
+            refreshTalkers(room)
         } catch {
             state = .failed(error.localizedDescription)
         }
@@ -57,6 +62,7 @@ final class CommsClient: ObservableObject {
         await room.disconnect()
         state = .idle
         talkers = []
+        consoleIsLive = false
     }
 
     /// `.playback` keeps AirPods in A2DP/AAC at full bandwidth. Do not switch
@@ -92,10 +98,22 @@ extension CommsClient: RoomDelegate {
         Task { @MainActor in self.refreshTalkers(room) }
     }
 
+    nonisolated func room(_ room: Room, participant _: RemoteParticipant, didSubscribeTrack _: RemoteTrackPublication) {
+        Task { @MainActor in self.refreshTalkers(room) }
+    }
+
+    nonisolated func room(_ room: Room, participant _: RemoteParticipant, didUnsubscribeTrack _: RemoteTrackPublication) {
+        Task { @MainActor in self.refreshTalkers(room) }
+    }
+
     @MainActor
     private func refreshTalkers(_ room: Room) {
-        talkers = room.remoteParticipants.values
-            .compactMap(\.identity?.stringValue)
-            .sorted()
+        let remotes = Array(room.remoteParticipants.values)
+        talkers = remotes.compactMap(\.identity?.stringValue).sorted()
+        // Detected by an audible track rather than by matching the bridge's
+        // identity, so renaming the bridge cannot silently break this.
+        consoleIsLive = remotes.contains { participant in
+            participant.audioTracks.contains { $0.isSubscribed }
+        }
     }
 }
