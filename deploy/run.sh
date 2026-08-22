@@ -31,7 +31,10 @@ case "$SERVICE" in
       exit 1
     fi
     export NODE_IP="$BELTPACK_NODE_IP"
-    exec livekit-server --config "$REPO/deploy/livekit.yaml"
+    # livekit.yaml binds loopback; a LAN test needs to override that without
+    # editing a committed file.
+    exec livekit-server --config "$REPO/deploy/livekit.yaml" \
+      --bind "${BELTPACK_BIND:-127.0.0.1}"
     ;;
   token)
     exec node "$REPO/token/server.mjs"

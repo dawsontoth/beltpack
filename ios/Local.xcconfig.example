@@ -1,0 +1,6 @@
+// Copy to Local.xcconfig and fill in. Gitignored — never commit a team id.
+//
+// Find yours with:  security find-identity -v -p codesigning
+// The parenthesised value in "Apple Development: Name (TEAMID)" is the team.
+
+DEVELOPMENT_TEAM =

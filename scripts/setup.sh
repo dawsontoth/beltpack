@@ -6,6 +6,7 @@
 # never silently replaced.
 #
 #   ./scripts/setup.sh --dev          this laptop, no WING, loopback only
+#   ./scripts/setup.sh --lan          same, but reachable by phones on the LAN
 #   ./scripts/setup.sh --production   the booth Mac wired to the console
 #
 set -euo pipefail
@@ -46,6 +47,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dev) MODE=dev ;;
+    --lan) MODE=lan ;;
     --production|--prod) MODE=production ;;
     --install) DO_INSTALL=true ;;
     --yes|-y) ASSUME_YES=true ;;
@@ -211,6 +213,18 @@ step "Network address"
 
 CURRENT_IP="$(env_get BELTPACK_NODE_IP)"
 
+detect_lan_ip() {
+  # Prefer the default-route interface; it is the one a phone will reach.
+  local iface
+  iface="$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')"
+  [[ -n "$iface" ]] && ipconfig getifaddr "$iface" 2>/dev/null && return 0
+  for i in $(networksetup -listallhardwareports 2>/dev/null | awk '/Device:/{print $2}'); do
+    local a; a="$(ipconfig getifaddr "$i" 2>/dev/null || true)"
+    [[ -n "$a" ]] && { printf '%s' "$a"; return 0; }
+  done
+  return 1
+}
+
 if [[ "$MODE" == "dev" ]]; then
   if [[ "$CURRENT_IP" != "127.0.0.1" ]]; then
     env_set BELTPACK_NODE_IP "127.0.0.1"
@@ -219,6 +233,22 @@ if [[ "$MODE" == "dev" ]]; then
     skip "node IP already 127.0.0.1"
   fi
   env_set BELTPACK_PUBLIC_URL "ws://127.0.0.1:7880"
+  env_set BELTPACK_BIND "127.0.0.1"
+  env_set TOKEN_BIND "127.0.0.1"
+elif [[ "$MODE" == "lan" ]]; then
+  # No TLS here. Fine for a bench test on a trusted network, not for a
+  # service — production puts Caddy in front and goes back to loopback.
+  if LAN_IP="$(detect_lan_ip)"; then
+    env_set BELTPACK_NODE_IP "$LAN_IP"
+    env_set BELTPACK_PUBLIC_URL "ws://${LAN_IP}:7880"
+    env_set BELTPACK_BIND "0.0.0.0"
+    env_set TOKEN_BIND "0.0.0.0"
+    did "listening on all interfaces, advertising $LAN_IP"
+    warn "cleartext on the LAN — bench testing only, no TLS"
+    printf '      %sPoint the phone at:%s %shttp://%s:7883%s\n' "$DIM" "$RESET" "$BOLD" "$LAN_IP" "$RESET"
+  else
+    todo "Could not detect a LAN address; set BELTPACK_NODE_IP by hand"
+  fi
 else
   if is_placeholder "$CURRENT_IP"; then
     DETECTED=""

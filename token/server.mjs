@@ -18,6 +18,9 @@ const {
   // terminates, not the loopback address LiveKit itself binds.
   BELTPACK_PUBLIC_URL = "ws://127.0.0.1:7880",
   TOKEN_PORT = "7883",
+  // Loopback by default because Caddy fronts this in production. A LAN test
+  // with no TLS needs 0.0.0.0 so a phone can reach it.
+  TOKEN_BIND = "127.0.0.1",
   // Phase 2: flip to "true" to let beltpacks publish push-to-talk audio.
   BELTPACK_CAN_PUBLISH = "false",
 } = process.env;
@@ -98,6 +101,6 @@ const server = createServer((req, res) => {
   console.log(`token: issued for "${identity}"`);
 });
 
-server.listen(Number(TOKEN_PORT), "127.0.0.1", () => {
-  console.log(`token: listening on 127.0.0.1:${TOKEN_PORT}, room "${BELTPACK_ROOM}"`);
+server.listen(Number(TOKEN_PORT), TOKEN_BIND, () => {
+  console.log(`token: listening on ${TOKEN_BIND}:${TOKEN_PORT}, room "${BELTPACK_ROOM}"`);
 });
