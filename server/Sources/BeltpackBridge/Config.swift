@@ -18,6 +18,10 @@ struct Config: Sendable {
     /// mics back into the console. Listen-only builds leave this false.
     let subscribes: Bool
 
+    /// Where the summed phone audio goes back out. Only used when
+    /// `subscribes` is true; route it to the WING channel feeding Bus 1.
+    let outputDeviceHint: String?
+
     static func fromEnvironment() throws -> Config {
         let env = ProcessInfo.processInfo.environment
 
@@ -41,6 +45,7 @@ struct Config: Sendable {
             identity: env["BELTPACK_IDENTITY"] ?? "wing-bridge",
             inputDeviceHint: try required("BELTPACK_INPUT_DEVICE"),
             subscribes: (env["BELTPACK_SUBSCRIBE"] ?? "false") == "true",
+            outputDeviceHint: env["BELTPACK_OUTPUT_DEVICE"].flatMap { $0.isEmpty ? nil : $0 },
         )
     }
 }

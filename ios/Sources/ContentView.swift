@@ -8,8 +8,23 @@ struct ContentView: View {
         NavigationStack {
             VStack(spacing: 28) {
                 Spacer()
-                StatusDial(state: comms.state)
+                StatusDial(state: comms.state, isTalking: comms.isTalking)
                 statusText
+                if isConnected, Settings.talkMode != .open {
+                    TalkButton(
+                        mode: Settings.talkMode,
+                        isTalking: comms.isTalking,
+                        onPress: { Task { await comms.startTalking() } },
+                        onRelease: { Task { await comms.stopTalking() } },
+                        onToggle: { Task { await comms.toggleTalking() } },
+                    )
+                }
+                if comms.micDenied {
+                    Text("Microphone access is off for Beltpack. Enable it in Settings.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                }
                 Spacer()
                 connectButton
             }
@@ -36,7 +51,9 @@ struct ContentView: View {
             Text("Connecting…").foregroundStyle(.secondary)
         case .listening:
             VStack(spacing: 6) {
-                Text("On comms").font(.headline)
+                Text(comms.isTalking ? "Talking" : "On comms")
+                    .font(.headline)
+                    .foregroundStyle(comms.isTalking ? .orange : .primary)
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -91,6 +108,7 @@ struct ContentView: View {
 /// often at arm's length.
 private struct StatusDial: View {
     let state: CommsClient.State
+    var isTalking = false
 
     var body: some View {
         Circle()
@@ -102,20 +120,90 @@ private struct StatusDial: View {
     }
 
     private var color: Color {
+        if isTalking { return .orange }
         switch state {
-        case .idle: .secondary
-        case .connecting, .reconnecting: .orange
-        case .listening: .green
-        case .failed: .red
+        case .idle: return .secondary
+        case .connecting, .reconnecting: return .orange
+        case .listening: return .green
+        case .failed: return .red
         }
     }
 
     private var symbol: String {
+        if isTalking { return "mic.fill" }
         switch state {
-        case .idle: "headphones"
-        case .connecting, .reconnecting: "arrow.triangle.2.circlepath"
-        case .listening: "headphones.circle.fill"
-        case .failed: "exclamationmark.triangle.fill"
+        case .idle: return "headphones"
+        case .connecting, .reconnecting: return "arrow.triangle.2.circlepath"
+        case .listening: return "headphones.circle.fill"
+        case .failed: return "exclamationmark.triangle.fill"
         }
+    }
+}
+
+/// The talk control. Big, because it gets pressed by someone whose eyes are
+/// on a camera rather than the phone, and haptic for the same reason.
+private struct TalkButton: View {
+    let mode: TalkMode
+    let isTalking: Bool
+    let onPress: () -> Void
+    let onRelease: () -> Void
+    let onToggle: () -> Void
+
+    @State private var pressed = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Circle()
+                .fill(isTalking ? Color.orange : Color.secondary.opacity(0.22))
+                .overlay(
+                    Image(systemName: isTalking ? "mic.fill" : "mic.slash.fill")
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundStyle(isTalking ? Color.black : Color.secondary),
+                )
+                .frame(width: 128, height: 128)
+                .scaleEffect(pressed ? 0.94 : 1)
+                .animation(.easeOut(duration: 0.12), value: pressed)
+                .contentShape(Circle())
+                .gesture(gesture)
+                .accessibilityLabel(mode == .pushToTalk ? "Hold to talk" : "Talk")
+                .accessibilityAddTraits(.isButton)
+
+            Text(caption)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var caption: String {
+        switch mode {
+        case .pushToTalk: isTalking ? "Release to stop" : "Hold to talk"
+        case .latch: isTalking ? "Tap to stop" : "Tap to talk"
+        case .open: "Mic open"
+        }
+    }
+
+    private var gesture: some Gesture {
+        // minimumDistance 0 so it fires on touch-down rather than on a drag,
+        // which is what makes press-and-talk feel immediate.
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard !pressed else { return }
+                pressed = true
+                haptic(.rigid)
+                if mode == .pushToTalk { onPress() }
+            }
+            .onEnded { _ in
+                pressed = false
+                haptic(.soft)
+                switch mode {
+                case .pushToTalk: onRelease()
+                case .latch: onToggle()
+                case .open: break
+                }
+            }
+    }
+
+    private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
 }

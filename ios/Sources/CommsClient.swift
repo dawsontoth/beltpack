@@ -20,6 +20,10 @@ final class CommsClient: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var talkers: [String] = []
     @Published private(set) var consoleIsLive = false
+    @Published private(set) var isTalking = false
+    @Published private(set) var micDenied = false
+
+    private var micPublication: LocalTrackPublication?
 
     private let room = Room()
     private var listenerTask: Task<Void, Never>?
@@ -37,7 +41,7 @@ final class CommsClient: ObservableObject {
         state = .connecting
 
         do {
-            try configureAudioSession()
+            try configureAudioSession(forTalking: false)
             let credentials = try await TokenService.fetch(
                 serverURL: Settings.serverURL,
                 identity: Settings.identity,
@@ -49,6 +53,9 @@ final class CommsClient: ObservableObject {
                 roomOptions: RoomOptions(adaptiveStream: false, dynacast: false),
             )
             state = .listening
+            if Settings.talkMode == .open {
+                await startTalking()
+            }
             // The bridge is normally already in the room when a beltpack
             // joins, so no participantDidConnect fires for it. Seed from
             // current state or the UI claims nothing is there.
@@ -59,22 +66,85 @@ final class CommsClient: ObservableObject {
     }
 
     func disconnect() async {
+        await stopTalking()
         await room.disconnect()
         state = .idle
         talkers = []
         consoleIsLive = false
     }
 
-    /// `.playback` keeps AirPods in A2DP/AAC at full bandwidth. Do not switch
-    /// this to `.playAndRecord` casually — that flips them to hands-free mode
-    /// and everything drops to 16 kHz mono in both directions.
-    private func configureAudioSession() throws {
+    /// Listen-only stays on `.playback`, which keeps the earbuds in A2DP/AAC
+    /// at full bandwidth. Once a mic is involved the category has to become
+    /// `.playAndRecord`, and the options then decide whether the earbuds keep
+    /// their quality — see `MicMode`.
+    private func configureAudioSession(forTalking: Bool) throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .spokenAudio, options: [])
-        try session.setActive(true)
+
+        if forTalking {
+            let mode = Settings.micMode
+            try session.setCategory(.playAndRecord, mode: mode.sessionMode, options: mode.sessionOptions)
+            try session.setActive(true)
+            if mode == .phoneMic {
+                // The decisive step. Without pinning input to the built-in mic
+                // iOS will happily route input to the earbuds anyway, drag the
+                // link into HFP, and undo the whole point of this mode.
+                if let builtIn = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                    try? session.setPreferredInput(builtIn)
+                }
+            }
+        } else {
+            try session.setCategory(.playback, mode: .spokenAudio, options: [])
+            try session.setActive(true)
+        }
+
         if #available(iOS 14.5, *) {
             try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
         }
+    }
+
+    // MARK: - Talking
+
+    func startTalking() async {
+        guard case .listening = state, micPublication == nil else { return }
+
+        guard await AVAudioApplication.requestRecordPermission() else {
+            micDenied = true
+            return
+        }
+        micDenied = false
+
+        do {
+            try configureAudioSession(forTalking: true)
+
+            // A voice in a loud sanctuary, unlike the console feed: leave
+            // WebRTC's echo cancellation and noise suppression switched on.
+            let track = LocalAudioTrack.createTrack(
+                name: "beltpack",
+                options: AudioCaptureOptions(
+                    echoCancellation: true,
+                    autoGainControl: true,
+                    noiseSuppression: true,
+                ),
+            )
+            micPublication = try await room.localParticipant.publish(audioTrack: track)
+            isTalking = true
+        } catch {
+            state = .failed(error.localizedDescription)
+            try? configureAudioSession(forTalking: false)
+        }
+    }
+
+    func stopTalking() async {
+        guard let publication = micPublication else { return }
+        micPublication = nil
+        isTalking = false
+        try? await room.localParticipant.unpublish(publication: publication)
+        // Back to .playback so the earbuds return to full-bandwidth listening.
+        try? configureAudioSession(forTalking: false)
+    }
+
+    func toggleTalking() async {
+        if isTalking { await stopTalking() } else { await startTalking() }
     }
 }
 

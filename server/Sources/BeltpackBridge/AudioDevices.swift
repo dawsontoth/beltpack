@@ -19,12 +19,38 @@ struct AudioInput: Sendable, Equatable {
     let channels: Int
 }
 
+enum AudioDirection: Sendable {
+    case input
+    case output
+
+    var scope: AudioObjectPropertyScope {
+        switch self {
+        case .input: kAudioObjectPropertyScopeInput
+        case .output: kAudioObjectPropertyScopeOutput
+        }
+    }
+
+    var defaultDeviceSelector: AudioObjectPropertySelector {
+        switch self {
+        case .input: kAudioHardwarePropertyDefaultInputDevice
+        case .output: kAudioHardwarePropertyDefaultOutputDevice
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .input: "input"
+        case .output: "output"
+        }
+    }
+}
+
 enum AudioDevices {
     // MARK: - Enumeration
 
-    static func list() -> [AudioInput] {
+    static func list(_ direction: AudioDirection = .input) -> [AudioInput] {
         allDeviceIDs().compactMap { id in
-            let channels = inputChannelCount(id)
+            let channels = channelCount(id, direction)
             guard channels > 0 else { return nil }
             return AudioInput(
                 id: id,
@@ -41,8 +67,8 @@ enum AudioDevices {
     /// finds "WING 48ch". Matching more than one device is an error rather
     /// than a coin flip — on a console feed, capturing the wrong thing is
     /// worse than refusing to start.
-    static func select(matching hint: String) throws -> AudioInput {
-        let devices = list()
+    static func select(matching hint: String, direction: AudioDirection = .input) throws -> AudioInput {
+        let devices = list(direction)
         let needle = hint.lowercased()
         let matches = devices.filter { $0.name.lowercased().contains(needle) }
 
@@ -53,12 +79,12 @@ enum AudioDevices {
         }
 
         let device = matches[0]
-        try setDefaultInput(device)
+        try setDefault(device, direction: direction)
         return device
     }
 
     static func currentDefaultInput() -> AudioObjectID? {
-        var addr = defaultInputAddress
+        var addr = defaultDeviceAddress(.input)
         var id = AudioObjectID(0)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &id) == noErr else {
@@ -67,15 +93,15 @@ enum AudioDevices {
         return id
     }
 
-    static func setDefaultInput(_ device: AudioInput) throws {
-        var addr = defaultInputAddress
+    static func setDefault(_ device: AudioInput, direction: AudioDirection = .input) throws {
+        var addr = defaultDeviceAddress(direction)
         var id = device.id
         let status = AudioObjectSetPropertyData(
             AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil,
             UInt32(MemoryLayout<AudioObjectID>.size), &id,
         )
         guard status == noErr else {
-            throw AudioDeviceError.couldNotSelect(name: device.name, status: status)
+            throw AudioDeviceError.couldNotSelect(name: device.name, direction: direction, status: status)
         }
     }
 
@@ -83,9 +109,9 @@ enum AudioDevices {
 
     // Computed, not stored: Core Audio wants an inout pointer, and a stored
     // static var is global mutable state under Swift 6 concurrency.
-    private static var defaultInputAddress: AudioObjectPropertyAddress {
+    private static func defaultDeviceAddress(_ direction: AudioDirection) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mSelector: direction.defaultDeviceSelector,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain,
         )
@@ -121,10 +147,10 @@ enum AudioDevices {
         return value as String
     }
 
-    private static func inputChannelCount(_ id: AudioObjectID) -> Int {
+    private static func channelCount(_ id: AudioObjectID, _ direction: AudioDirection) -> Int {
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
-            mScope: kAudioObjectPropertyScopeInput,
+            mScope: direction.scope,
             mElement: kAudioObjectPropertyElementMain,
         )
         var size: UInt32 = 0
@@ -145,7 +171,7 @@ enum AudioDevices {
 enum AudioDeviceError: LocalizedError {
     case notFound(hint: String, available: [AudioInput])
     case ambiguous(hint: String, matches: [AudioInput])
-    case couldNotSelect(name: String, status: OSStatus)
+    case couldNotSelect(name: String, direction: AudioDirection, status: OSStatus)
 
     var errorDescription: String? {
         switch self {
@@ -165,8 +191,8 @@ enum AudioDeviceError: LocalizedError {
             \(list)
             Make BELTPACK_INPUT_DEVICE more specific.
             """
-        case let .couldNotSelect(name, status):
-            return "Could not make \"\(name)\" the default input (Core Audio status \(status))."
+        case let .couldNotSelect(name, direction, status):
+            return "Could not make \"\(name)\" the default \(direction.label) (Core Audio status \(status))."
         }
     }
 }

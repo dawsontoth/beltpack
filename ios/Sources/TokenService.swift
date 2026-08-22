@@ -10,7 +10,9 @@ enum TokenService {
     }
 
     static func fetch(serverURL: String, identity: String, passcode: String) async throws -> Credentials {
-        guard var components = URLComponents(string: serverURL) else {
+        guard let base = ServerAddress.normalize(serverURL),
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false)
+        else {
             throw TokenError.badServerURL(serverURL)
         }
         components.path = "/token"
@@ -49,7 +51,8 @@ enum TokenError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .badServerURL(value): "\"\(value)\" isn't a valid server address."
+        case let .badServerURL(value):
+            "Can't make sense of \"\(value)\". Try an address like 192.168.1.50 or comms.yourchurch.org."
         case .unreachable: "Can't reach the comms server. Check you're on the comms Wi-Fi."
         case .wrongPasscode: "That passcode was rejected."
         case let .server(code): "Comms server returned \(code)."

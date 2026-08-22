@@ -2,7 +2,7 @@ name: Beltpack
 options:
   bundleIdPrefix: org.beltpack
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
@@ -65,3 +65,27 @@ targets:
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+
+  BeltpackTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Beltpack
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Beltpack:
+    build:
+      targets:
+        Beltpack: all
+        BeltpackTests: [test]
+    test:
+      targets:
+        - BeltpackTests
+    run:
+      config: Debug

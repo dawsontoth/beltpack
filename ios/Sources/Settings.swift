@@ -13,6 +13,8 @@ enum Settings {
         static let serverURL = "beltpack.serverURL"
         static let identity = "beltpack.identity"
         static let passcode = "beltpack.passcode"
+        static let micMode = "beltpack.micMode"
+        static let talkMode = "beltpack.talkMode"
     }
 
     static let defaultServerURL = "https://comms.example.org"
@@ -32,7 +34,24 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: Key.passcode) }
     }
 
+    /// Defaults to the headset: on comms, latency and free hands beat fidelity.
+    /// Switch to `.phoneMic` when sound quality matters more than either.
+    static var micMode: MicMode {
+        get { MicMode(rawValue: UserDefaults.standard.string(forKey: Key.micMode) ?? "") ?? .headsetMic }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: Key.micMode) }
+    }
+
+    static var talkMode: TalkMode {
+        get { TalkMode(rawValue: UserDefaults.standard.string(forKey: Key.talkMode) ?? "") ?? .pushToTalk }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: Key.talkMode) }
+    }
+
     static var isConfigured: Bool {
-        !identity.isEmpty && !passcode.isEmpty && URL(string: serverURL) != nil
+        !identity.isEmpty && !passcode.isEmpty && resolvedServerURL != nil
+    }
+
+    /// What `serverURL` actually resolves to once tidied up.
+    static var resolvedServerURL: URL? {
+        ServerAddress.normalize(serverURL)
     }
 }

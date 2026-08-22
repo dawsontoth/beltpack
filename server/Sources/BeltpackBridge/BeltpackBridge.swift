@@ -52,7 +52,19 @@ struct BeltpackBridge {
         }
 
         let device = try AudioDevices.select(matching: config.inputDeviceHint)
-        log("capturing from \(device.name)")
+        log("capturing from \(device.name) (\(device.channels) ch)")
+
+        // Phase 2 return leg: subscribed phone audio plays out of the system
+        // default output, so point that at the WING channel feeding Bus 1.
+        // The console keeps it out of Bus 2 — that is the mix-minus that stops
+        // phone users hearing themselves a quarter-second late.
+        if config.subscribes {
+            guard let outputHint = config.outputDeviceHint else {
+                throw BridgeError.missingOutputDevice
+            }
+            let output = try AudioDevices.select(matching: outputHint, direction: .output)
+            log("returning phone audio to \(output.name) (\(output.channels) ch)")
+        }
 
         let token = try AccessToken.mint(
             apiKey: config.apiKey,
@@ -110,8 +122,14 @@ struct BeltpackBridge {
 
 enum BridgeError: LocalizedError {
     case microphoneUnavailable
+    case missingOutputDevice
 
     var errorDescription: String? {
-        "cannot capture without microphone access (see the guidance above)"
+        switch self {
+        case .microphoneUnavailable:
+            "cannot capture without microphone access (see the guidance above)"
+        case .missingOutputDevice:
+            "BELTPACK_SUBSCRIBE is on, so set BELTPACK_OUTPUT_DEVICE to the WING channel that feeds Bus 1"
+        }
     }
 }
