@@ -41,13 +41,20 @@ WING input channel that routes to Bus 1 **only**.
 ## Quickstart
 
 ```bash
-cp .env.example .env          # then fill it in
-make devices                  # find the WING's Core Audio name
-make build                    # bridge + PWA
-make run-livekit              # in one terminal
-make run-token                # in another
-make run-bridge               # in a third
-make ios                      # opens Xcode
+make setup-dev     # this laptop: installs tools, writes .env, smoke-tests LiveKit
+make setup         # the booth Mac: same, but requires a real LAN address
+```
+
+`setup.sh` is idempotent — run it as often as you like. It generates API
+credentials and a join passcode on first run, never replaces an existing
+secret, and finishes by telling you exactly what is still outstanding. Then:
+
+```bash
+make build         # bridge + PWA
+make run-livekit   # in one terminal
+make run-token     # in another
+make run-bridge    # in a third
+make ios           # opens Xcode
 ```
 
 `make check` builds everything and lints what can be linted.

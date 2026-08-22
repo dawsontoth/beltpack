@@ -8,6 +8,16 @@ help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
+# ---- setup ----------------------------------------------------------------
+
+.PHONY: setup-dev
+setup-dev: ## Configure this machine for local development (no WING needed)
+	./scripts/setup.sh --dev --install
+
+.PHONY: setup
+setup: ## Configure the booth Mac for production
+	./scripts/setup.sh --production --install
+
 # ---- build ----------------------------------------------------------------
 
 .PHONY: build
