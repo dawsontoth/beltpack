@@ -8,16 +8,16 @@ import Foundation
 /// prompt — it just silently returns devices with their names redacted. Only
 /// an explicit request, or a real capture attempt, prompts. So the bridge asks
 /// for permission up front rather than waiting to be told no.
-enum Microphone {
-    static var status: AVAuthorizationStatus {
+public enum Microphone {
+    public static var status: AVAuthorizationStatus {
         AVCaptureDevice.authorizationStatus(for: .audio)
     }
 
-    static func requestAccess() async -> Bool {
+    public static func requestAccess() async -> Bool {
         await AVCaptureDevice.requestAccess(for: .audio)
     }
 
-    static var statusDescription: String {
+    public static var statusDescription: String {
         switch status {
         case .authorized: "granted"
         case .notDetermined: "not yet requested"
@@ -29,7 +29,7 @@ enum Microphone {
 
     /// Returns true when capture can proceed. Prints actionable guidance and
     /// returns false when it cannot.
-    static func ensureAccess() async -> Bool {
+    public static func ensureAccess() async -> Bool {
         switch status {
         case .authorized:
             return true

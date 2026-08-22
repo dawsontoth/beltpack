@@ -68,7 +68,8 @@ the processing that rescues the first wrecks the second.
 
 | Path | What it is |
 |---|---|
-| `server/` | Swift. Publishes a WING console bus into a LiveKit room as Opus. |
+| `server/` | Swift package. `BeltpackKit` holds the shared logic; `BeltpackBridge` is the headless CLI. |
+| `mac/` | SwiftUI host app: pick devices, watch participants, start and stop. |
 | `ios/` | Swift + XcodeGen. The native app, because iOS Safari suspends WebRTC on lock. |
 | `web/` | PWA for Android and booth laptops, where background audio already works. |
 | `token/` | Zero-dependency Node service. Trades a passcode for a short-lived token. |
@@ -86,6 +87,7 @@ credentials and a join passcode on first run, never replaces an existing
 secret, and finishes by telling you exactly what is still outstanding. Then:
 
 ```bash
+make mac           # build and launch the Mac host app
 make build         # bridge + PWA
 make run-livekit   # in one terminal
 make run-token     # in another
@@ -94,6 +96,26 @@ make ios           # opens Xcode
 ```
 
 `make check` builds everything and lints what can be linted.
+
+## The Mac host app
+
+`make mac` builds and launches a SwiftUI front end for the same bridge — device
+pickers with channel counts, live participant list with mute and speaking
+state, and start/stop, plus a menu bar item for glancing at it mid-service.
+
+Prefer it to the CLI on the booth Mac, for a reason beyond convenience: a
+bundled app has its own TCC identity, so the microphone prompt is attributed to
+Beltpack itself. A bare CLI binary has no identity of its own and its prompt is
+attributed to whatever terminal launched it, which is why the headless bridge
+needs its permission granted against your terminal app.
+
+It reads the same `.env` as everything else — looking in the obvious places
+first, with a file picker if it guesses wrong. Diagnostics go to the unified
+log rather than stdout, since a bundled app has nowhere to print:
+
+```bash
+make mac-logs
+```
 
 ## Three things that will bite you
 

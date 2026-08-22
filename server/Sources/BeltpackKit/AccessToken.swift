@@ -6,15 +6,22 @@ import Foundation
 /// The bridge runs on the same machine as the LiveKit server and already holds
 /// the API secret, so it signs its own token rather than round-tripping through
 /// the token service the phones use.
-enum AccessToken {
-    struct Grants {
-        var room: String
-        var canPublish: Bool
-        var canSubscribe: Bool
-        var canPublishData: Bool = false
+public enum AccessToken {
+    public struct Grants {
+        public var room: String
+        public var canPublish: Bool
+        public var canSubscribe: Bool
+        public var canPublishData: Bool = false
+
+        public init(room: String, canPublish: Bool, canSubscribe: Bool, canPublishData: Bool = false) {
+            self.room = room
+            self.canPublish = canPublish
+            self.canSubscribe = canSubscribe
+            self.canPublishData = canPublishData
+        }
     }
 
-    static func mint(
+    public static func mint(
         apiKey: String,
         apiSecret: String,
         identity: String,

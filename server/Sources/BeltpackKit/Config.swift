@@ -4,26 +4,34 @@ import Foundation
 ///
 /// Nothing is hard-coded and nothing is committed: `make run` loads `.env`
 /// from the repo root before exec'ing the binary.
-struct Config: Sendable {
-    let livekitURL: String
-    let apiKey: String
-    let apiSecret: String
-    let room: String
-    let identity: String
+public struct Config: Sendable {
+    public let livekitURL: String
+    public let apiKey: String
+    public let apiSecret: String
+    public let room: String
+    public let identity: String
 
     /// Substring matched against Core Audio input device names, e.g. "WING".
-    let inputDeviceHint: String
+    public let inputDeviceHint: String
 
     /// Phase 2. When true the bridge also subscribes, so it can sum the phone
     /// mics back into the console. Listen-only builds leave this false.
-    let subscribes: Bool
+    public let subscribes: Bool
 
     /// Where the summed phone audio goes back out. Only used when
     /// `subscribes` is true; route it to the WING channel feeding Bus 1.
-    let outputDeviceHint: String?
+    public let outputDeviceHint: String?
 
-    static func fromEnvironment() throws -> Config {
-        let env = ProcessInfo.processInfo.environment
+    public static func fromEnvironment() throws -> Config {
+        try from(ProcessInfo.processInfo.environment)
+    }
+
+    /// Same validation, reading a `.env` file instead of the environment.
+    public static func fromEnvFile(_ url: URL) throws -> Config {
+        try from(EnvFile.load(url))
+    }
+
+    public static func from(_ env: [String: String]) throws -> Config {
 
         func required(_ key: String) throws -> String {
             guard let value = env[key], !value.isEmpty else {
@@ -50,11 +58,11 @@ struct Config: Sendable {
     }
 }
 
-enum ConfigError: LocalizedError {
+public enum ConfigError: LocalizedError {
     case missing(String)
     case secretTooShort(Int)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case let .missing(key):
             "Set \(key). Copy .env.example to .env and fill it in."

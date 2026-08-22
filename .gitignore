@@ -24,3 +24,5 @@ deploy/livekit.local.yaml
 *.log
 logs/
 ios/Local.xcconfig
+mac/build/
+mac/Info.plist

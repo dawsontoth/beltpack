@@ -32,8 +32,19 @@ web: ## Install deps and bundle the PWA
 	cd web && npm install && npm run build
 
 .PHONY: ios
-ios: ## Regenerate and open the Xcode project
+ios: ## Regenerate and open the iOS Xcode project
 	cd ios && xcodegen generate && open Beltpack.xcodeproj
+
+.PHONY: mac
+mac: ## Build and launch the Mac host app
+	cd mac && xcodegen generate
+	cd mac && xcodebuild -project BeltpackHost.xcodeproj -scheme BeltpackHost \
+		-configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+	open mac/build/Build/Products/Debug/BeltpackHost.app
+
+.PHONY: mac-logs
+mac-logs: ## Follow the Mac app's diagnostics
+	/usr/bin/log stream --predicate 'subsystem == "org.beltpack"' --style compact
 
 # ---- run locally ----------------------------------------------------------
 
@@ -84,7 +95,9 @@ logs: ## Tail all service logs
 .PHONY: check
 check: ## Build everything and lint what can be linted
 	cd server && swift build
+	cd server && swift test
 	cd ios && xcodegen generate
+	cd mac && xcodegen generate
 	cd web && npm install && npm run build
 	node --check token/server.mjs
 	bash -n deploy/run.sh
@@ -93,4 +106,6 @@ check: ## Build everything and lint what can be linted
 
 .PHONY: clean
 clean: ## Remove build output
-	rm -rf server/.build web/dist web/node_modules ios/Beltpack.xcodeproj ios/Info.plist
+	rm -rf server/.build web/dist web/node_modules \
+		ios/Beltpack.xcodeproj ios/Info.plist \
+		mac/BeltpackHost.xcodeproj mac/Info.plist mac/build

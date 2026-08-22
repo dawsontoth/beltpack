@@ -12,14 +12,14 @@ import Foundation
 /// WebRTC audio device module captures the default. On a dedicated booth Mac
 /// that is the right trade; the bridge logs the change so it is never a
 /// surprise.
-struct AudioInput: Sendable, Equatable {
-    let id: AudioObjectID
-    let name: String
-    let uid: String
-    let channels: Int
+public struct AudioInput: Sendable, Equatable, Identifiable, Hashable {
+    public let id: AudioObjectID
+    public let name: String
+    public let uid: String
+    public let channels: Int
 }
 
-enum AudioDirection: Sendable {
+public enum AudioDirection: Sendable {
     case input
     case output
 
@@ -37,7 +37,7 @@ enum AudioDirection: Sendable {
         }
     }
 
-    var label: String {
+    public var label: String {
         switch self {
         case .input: "input"
         case .output: "output"
@@ -45,10 +45,10 @@ enum AudioDirection: Sendable {
     }
 }
 
-enum AudioDevices {
+public enum AudioDevices {
     // MARK: - Enumeration
 
-    static func list(_ direction: AudioDirection = .input) -> [AudioInput] {
+    public static func list(_ direction: AudioDirection = .input) -> [AudioInput] {
         allDeviceIDs().compactMap { id in
             let channels = channelCount(id, direction)
             guard channels > 0 else { return nil }
@@ -67,7 +67,7 @@ enum AudioDevices {
     /// finds "WING 48ch". Matching more than one device is an error rather
     /// than a coin flip — on a console feed, capturing the wrong thing is
     /// worse than refusing to start.
-    static func select(matching hint: String, direction: AudioDirection = .input) throws -> AudioInput {
+    public static func select(matching hint: String, direction: AudioDirection = .input) throws -> AudioInput {
         let devices = list(direction)
         let needle = hint.lowercased()
         let matches = devices.filter { $0.name.lowercased().contains(needle) }
@@ -83,11 +83,11 @@ enum AudioDevices {
         return device
     }
 
-    static func currentDefaultOutput() -> AudioObjectID? {
+    public static func currentDefaultOutput() -> AudioObjectID? {
         currentDefault(.output)
     }
 
-    static func currentDefaultInput() -> AudioObjectID? {
+    public static func currentDefaultInput() -> AudioObjectID? {
         currentDefault(.input)
     }
 
@@ -101,7 +101,7 @@ enum AudioDevices {
         return id
     }
 
-    static func setDefault(_ device: AudioInput, direction: AudioDirection = .input) throws {
+    public static func setDefault(_ device: AudioInput, direction: AudioDirection = .input) throws {
         var addr = defaultDeviceAddress(direction)
         var id = device.id
         let status = AudioObjectSetPropertyData(
@@ -176,12 +176,12 @@ enum AudioDevices {
     }
 }
 
-enum AudioDeviceError: LocalizedError {
+public enum AudioDeviceError: LocalizedError {
     case notFound(hint: String, available: [AudioInput])
     case ambiguous(hint: String, matches: [AudioInput])
     case couldNotSelect(name: String, direction: AudioDirection, status: OSStatus)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case let .notFound(hint, available):
             let list = available.isEmpty
