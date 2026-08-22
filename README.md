@@ -92,6 +92,25 @@ out is `.playAndRecord` with `.allowBluetoothA2DP` (not `.allowBluetooth`) plus
 `setPreferredInput()` forced to the built-in mic, so output stays in AAC and
 you talk into the phone you are already holding.
 
+## Known issue: virtual audio devices
+
+Some virtual devices (ZoomAudioDevice is one) advertise a perfectly valid
+format — 48 kHz, correct channel count, no error status — and then fail when
+AVAudioEngine opens them, killing the process with an uncaught ObjC exception:
+
+```
+*** Terminating app due to uncaught exception 'com.apple.coreaudio.avfaudio',
+    reason: 'Input HW format is invalid'
+```
+
+There is no cheap way to detect this in advance; the device only misbehaves
+once opened. Real class-compliant hardware is fine — a Yeti X and the WING both
+capture normally. If you see this, the last `beltpack-bridge:` line in the log
+names the device that did it. Point `BELTPACK_INPUT_DEVICE` somewhere else.
+
+Note that launchd will restart the bridge every 10s in this state, so the log
+grows fast.
+
 ## What this is not
 
 An in-ear monitor system. Expect roughly 130 ms to wired earbuds and 250 ms to

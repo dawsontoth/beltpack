@@ -11,7 +11,7 @@ struct BeltpackBridge {
         // `--devices` lists Core Audio inputs and exits, so you can find the
         // WING's exact name without booting the whole bridge.
         if CommandLine.arguments.contains("--devices") {
-            printDevices()
+            await printDevices()
             return
         }
 
@@ -23,21 +23,33 @@ struct BeltpackBridge {
         }
     }
 
-    private static func printDevices() {
+    private static func printDevices() async {
+        // Ask first. Enumerating alone never prompts, it just hands back
+        // redacted names, which looks exactly like having no hardware.
+        _ = await Microphone.ensureAccess()
+        print("Microphone access: \(Microphone.statusDescription)")
+
         let devices = AudioDevices.list()
         guard !devices.isEmpty else {
             print("No Core Audio input devices found.")
             return
         }
+        let current = AudioDevices.currentDefaultInput()
         print("Core Audio inputs (\(devices.count)):")
         for device in devices {
-            let name = device.name.isEmpty ? "<no name — grant Microphone permission>" : device.name
-            print("  \(name)\(device.isDefault ? "  (default)" : "")  [id: \(device.deviceId)]")
+            let marker = device.id == current ? "  (current default)" : ""
+            // Channel count is how you spot the console at a glance: the WING
+            // reports 48 in, everything else on a Mac reports 1 or 2.
+            print("  \(device.name)  —  \(device.channels) in\(marker)")
         }
     }
 
     private static func run() async throws {
         let config = try Config.fromEnvironment()
+
+        guard await Microphone.ensureAccess() else {
+            throw BridgeError.microphoneUnavailable
+        }
 
         let device = try AudioDevices.select(matching: config.inputDeviceHint)
         log("capturing from \(device.name)")
@@ -76,6 +88,11 @@ struct BeltpackBridge {
             ),
         )
 
+        // Logged before the publish, not after: if the device reports a valid
+        // format but fails when AVAudioEngine actually opens it, the process
+        // dies here with an uncaught ObjC exception and this is the last line
+        // in the log. It names the culprit.
+        log("opening \(device.name) for capture…")
         _ = try await room.localParticipant.publish(audioTrack: track)
         log("publishing — beltpacks can join")
 
@@ -88,5 +105,13 @@ struct BeltpackBridge {
 
     private static func log(_ message: String) {
         print("beltpack-bridge: \(message)")
+    }
+}
+
+enum BridgeError: LocalizedError {
+    case microphoneUnavailable
+
+    var errorDescription: String? {
+        "cannot capture without microphone access (see the guidance above)"
     }
 }
