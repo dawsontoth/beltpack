@@ -1,0 +1,40 @@
+# Beltpack reverse proxy.
+#
+# The whole reason Caddy is here: browsers refuse WebRTC and service workers
+# without a secure context, and a bare LAN IP is not one. A DNS-01 challenge
+# gets a real Let's Encrypt cert for a hostname whose A record points at a
+# private address — legal, common, and it keeps working when the building's
+# internet does not.
+#
+# Swap `cloudflare` for whichever DNS provider you use, and build Caddy with
+# that plugin: xcaddy build --with github.com/caddy-dns/cloudflare
+
+comms.example.org {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+
+	# LiveKit signalling. Must come before the static handler.
+	handle /rtc* {
+		reverse_proxy 127.0.0.1:7880
+	}
+
+	handle /twirp* {
+		reverse_proxy 127.0.0.1:7880
+	}
+
+	# Token minting.
+	handle /token* {
+		reverse_proxy 127.0.0.1:7883
+	}
+
+	# The PWA itself. Point this at your checkout.
+	handle {
+		root * /Users/CHANGEME/Code/beltpack/web
+		file_server
+		header /sw.js Cache-Control "no-cache"
+		header /dist/* Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	encode gzip
+}

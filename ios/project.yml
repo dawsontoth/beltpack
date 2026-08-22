@@ -1,0 +1,52 @@
+name: Beltpack
+options:
+  bundleIdPrefix: org.beltpack
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-swift.git
+    from: "2.16.0"
+
+targets:
+  Beltpack:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: LiveKit
+        product: LiveKit
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Beltpack
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # The whole reason this is a native app rather than a web page:
+        # iOS Safari suspends WebRTC the moment the screen locks.
+        UIBackgroundModes:
+          - audio
+        # Phase 2 only — but declaring it now keeps the TestFlight
+        # description stable when push-to-talk lands.
+        NSMicrophoneUsageDescription: >-
+          Beltpack uses the microphone for push-to-talk on the comms channel.
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        # Set DEVELOPMENT_TEAM in ios/Local.xcconfig (gitignored) rather
+        # than committing a team id.
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG

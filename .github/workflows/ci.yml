@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  server:
+    name: Bridge (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: swift build
+        working-directory: server
+
+  ios:
+    name: iOS app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: xcodegen generate
+        working-directory: ios
+      - name: Build
+        working-directory: ios
+        run: |
+          xcodebuild -project Beltpack.xcodeproj -scheme Beltpack \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO build
+
+  web:
+    name: PWA and token service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+      - run: npm install
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: node --check token/server.mjs
+      - run: bash -n deploy/run.sh

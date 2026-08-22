@@ -1,0 +1,111 @@
+/* Read in a dark booth, often at arm's length. Big targets, high contrast. */
+:root {
+  --ground: #0e1116;
+  --surface: #161b22;
+  --ink: #e6eaf0;
+  --ink-muted: #8c97a5;
+  --rule: #2a323d;
+  --idle: #8c97a5;
+  --busy: #e8a33d;
+  --live: #3fbfcb;
+  --failed: #e5484d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, sans-serif;
+  display: grid;
+  place-items: center;
+  padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+}
+
+main {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 32px 0;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+#dial {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: 3px solid var(--idle);
+  background: color-mix(in srgb, var(--idle) 16%, transparent);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+#dial[data-state="connecting"] { border-color: var(--busy); background: color-mix(in srgb, var(--busy) 16%, transparent); }
+#dial[data-state="listening"]  { border-color: var(--live); background: color-mix(in srgb, var(--live) 16%, transparent); }
+#dial[data-state="failed"]     { border-color: var(--failed); background: color-mix(in srgb, var(--failed) 16%, transparent); }
+
+.readout { text-align: center; min-height: 3.2rem; }
+.readout p { margin: 0; }
+#status { font-size: 1.1rem; font-weight: 600; }
+#detail { color: var(--ink-muted); font-size: 0.9rem; }
+
+#join {
+  width: 100%;
+  padding: 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ground);
+  background: var(--live);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#join[data-connected="true"] { background: var(--failed); color: var(--ink); }
+#join:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+#settings {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+input {
+  font: inherit;
+  padding: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+input:focus-visible { outline: 2px solid var(--live); outline-offset: 1px; }
+
+.hint { margin: 0; font-size: 0.8rem; color: var(--ink-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

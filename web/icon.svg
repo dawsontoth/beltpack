@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Beltpack">
+  <rect width="512" height="512" rx="112" fill="#0e1116"/>
+  <path d="M136 288v-32a120 120 0 0 1 240 0v32" fill="none" stroke="#3fbfcb" stroke-width="30" stroke-linecap="round"/>
+  <rect x="104" y="284" width="72" height="108" rx="30" fill="#3fbfcb"/>
+  <rect x="336" y="284" width="72" height="108" rx="30" fill="#3fbfcb"/>
+</svg>

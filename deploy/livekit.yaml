@@ -1,0 +1,36 @@
+# LiveKit server for beltpack. Runs on the booth Mac, reachable only from the
+# comms VLAN. Caddy terminates TLS in front of it.
+#
+# Ports, all of which must be open on the comms VLAN:
+#   7880  signalling (HTTP/WebSocket) — Caddy proxies to this, loopback only
+#   7881  RTC over TCP, the fallback when UDP is blocked
+#   7882  RTC over UDP, single-port mux — this is where the audio actually flows
+#   7883  the beltpack token service (see token/server.mjs)
+
+port: 7880
+bind_addresses:
+  # Signalling stays on loopback; Caddy is the only thing that talks to it.
+  - 127.0.0.1
+
+rtc:
+  tcp_port: 7881
+  # Single UDP port rather than a range: one firewall rule instead of fifty.
+  udp_port: 7882
+  # This is a private LAN. Do not go looking for a public address.
+  use_external_ip: false
+  # REQUIRED: the booth Mac's LAN address on the comms VLAN. Phones connect
+  # their media straight here, bypassing Caddy.
+  node_ip: 192.168.10.10
+
+# Generate real values with: livekit-server generate-keys
+# Then put the same pair in .env — never commit them.
+keys:
+  devkey: REPLACE-WITH-A-SECRET-OF-AT-LEAST-32-CHARACTERS
+
+logging:
+  level: info
+
+room:
+  # Comms is one long-lived room; do not tear it down between services.
+  empty_timeout: 86400
+  max_participants: 25

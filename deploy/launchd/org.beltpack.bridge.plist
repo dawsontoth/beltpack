@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  WING audio bridge.
+
+  A LaunchAgent, not a LaunchDaemon, and deliberately so: capturing the WING
+  counts as microphone access under TCC, and a daemon has no login session to
+  prompt in. The Mac needs auto-login for this to come back after a reboot.
+
+  Install with `make install-agents`, which rewrites REPO to this checkout.
+  Secrets stay in .env and are loaded by run.sh, never stored in this file.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>org.beltpack.bridge</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>REPO/deploy/run.sh</string>
+    <string>bridge</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>REPO</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>REPO/logs/bridge.log</string>
+  <key>StandardErrorPath</key>
+  <string>REPO/logs/bridge.log</string>
+</dict>
+</plist>

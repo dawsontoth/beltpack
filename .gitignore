@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Swift / SwiftPM
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# XcodeGen output (regenerate with `make ios`)
+ios/Info.plist
+
+# Node
+node_modules/
+web/dist/
+
+# Local config — never commit API secrets
+.env
+*.local.yaml
+deploy/livekit.local.yaml
+
+# Logs
+*.log
+logs/
