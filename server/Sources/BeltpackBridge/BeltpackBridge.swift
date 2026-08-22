@@ -119,33 +119,57 @@ struct BeltpackBridge {
             throw BridgeError.microphoneUnavailable
         }
 
-        let device = try AudioDevices.select(matching: config.inputDeviceHint)
-        log("capturing from \(device.name) (\(device.channels) ch)")
+        // Resolve devices up front, so a bad hint fails immediately with a list
+        // of what is actually attached rather than at reconnect time.
+        let input = try AudioDevices.select(matching: config.inputDeviceHint)
+        log("capturing from \(input.name) (\(input.channels) ch)")
 
-        // Phase 2 return leg: subscribed phone audio plays out of the system
-        // default output, so point that at the WING channel feeding Bus 1.
-        // The console keeps it out of Bus 2 — that is the mix-minus that stops
-        // phone users hearing themselves a quarter-second late.
         if config.subscribes {
-            guard let outputHint = config.outputDeviceHint else {
+            guard let hint = config.outputDeviceHint else {
                 throw BridgeError.missingOutputDevice
             }
-            let output = try AudioDevices.select(matching: outputHint, direction: .output)
+            let output = try AudioDevices.select(matching: hint, direction: .output)
             log("returning phone audio to \(output.name) (\(output.channels) ch)")
         }
 
+        // Deliberately not the Mac app's BridgeController: that type is
+        // @MainActor, and creating a Room under main-actor isolation in a
+        // process with no app run loop wedges a WebRTC signalling thread. The
+        // GUI is fine; a command-line tool is not.
+        var attempt = 0
+        while true {
+            do {
+                try await connectAndPublish(config: config)
+                attempt = 0
+                log("publishing — beltpacks can join")
+
+                // Hold here until the connection drops.
+                try await waitForDisconnect()
+                log("connection lost — retrying")
+            } catch {
+                log("connect failed: \(error.localizedDescription)")
+            }
+
+            attempt += 1
+            let delay = min(pow(2.0, Double(attempt - 1)), 15)
+            try await Task.sleep(for: .seconds(delay))
+        }
+    }
+
+    private static let room = Room()
+    private static let watcher = DisconnectWatcher()
+
+    private static func connectAndPublish(config: Config) async throws {
         let token = try AccessToken.mint(
             apiKey: config.apiKey,
             apiSecret: config.apiSecret,
             identity: config.identity,
-            grants: .init(
-                room: config.room,
-                canPublish: true,
-                canSubscribe: config.subscribes,
-            ),
+            grants: .init(room: config.room, canPublish: true, canSubscribe: config.subscribes),
         )
 
-        let room = Room()
+        await room.add(delegate: watcher)
+        await watcher.reset()
+
         try await room.connect(
             url: config.livekitURL,
             token: token,
@@ -153,10 +177,8 @@ struct BeltpackBridge {
         )
         log("connected to \(config.room) at \(config.livekitURL)")
 
-        // This is a console feed, not somebody talking into a phone. Every piece
-        // of voice processing WebRTC would helpfully apply — echo cancellation,
-        // noise suppression, gain riding — actively damages it, so all of it is
-        // off. Gain staging belongs on the WING, where you can see it.
+        // A console feed, not somebody talking into a phone: every voice
+        // processing effect off. Gain staging belongs on the WING.
         let track = LocalAudioTrack.createTrack(
             name: "console",
             options: AudioCaptureOptions(
@@ -167,20 +189,18 @@ struct BeltpackBridge {
                 typingNoiseDetection: false,
             ),
         )
-
-        // Logged before the publish, not after: if the device reports a valid
-        // format but fails when AVAudioEngine actually opens it, the process
-        // dies here with an uncaught ObjC exception and this is the last line
-        // in the log. It names the culprit.
-        log("opening \(device.name) for capture…")
+        log("opening \(config.inputDeviceHint) for capture…")
         _ = try await room.localParticipant.publish(audioTrack: track)
-        log("publishing — beltpacks can join")
+    }
 
-        // Nothing else to do on this thread; the SDK owns the audio path.
-        // Park forever so launchd keeps us alive.
-        while true {
-            try await Task.sleep(for: .seconds(3600))
+    private static func waitForDisconnect() async throws {
+        // Poll rather than bridge a delegate callback into a continuation:
+        // a missed or doubled resume here would either wedge the bridge or
+        // crash it, and neither is worth the elegance.
+        while await !watcher.didDisconnect {
+            try await Task.sleep(for: .seconds(1))
         }
+        await room.disconnect()
     }
 
     private static func log(_ message: String) {

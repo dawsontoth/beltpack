@@ -28,6 +28,11 @@ final class CommsClient: ObservableObject {
     //   log stream --device --predicate 'subsystem == "org.beltpack"'
     private let log = Logger(subsystem: "org.beltpack", category: "comms")
 
+    /// Set while the user means to be on comms. A drop is only worth retrying
+    /// if nobody tapped Leave — an access-point roam should recover itself.
+    private var shouldBeConnected = false
+    private var reconnectTask: Task<Void, Never>?
+
     private var micTrack: LocalAudioTrack?
     private var micPublication: LocalTrackPublication?
 
@@ -44,6 +49,7 @@ final class CommsClient: ObservableObject {
             return
         }
 
+        shouldBeConnected = true
         state = .connecting
 
         do {
@@ -76,11 +82,41 @@ final class CommsClient: ObservableObject {
             // current state or the UI claims nothing is there.
             refreshTalkers(room)
         } catch {
-            state = .failed(error.localizedDescription)
+            if shouldBeConnected {
+                scheduleReconnect(reason: error.localizedDescription)
+            } else {
+                state = .failed(error.localizedDescription)
+            }
         }
     }
 
+    /// Retries with backoff. Camera operators roam between access points, and
+    /// an unassisted roam is the failure most likely to happen in practice.
+    private func scheduleReconnect(reason: String) {
+        guard shouldBeConnected, reconnectTask == nil else { return }
+        state = .reconnecting
+
+        reconnectTask = Task { [weak self] in
+            var delay: Double = 1
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, await self.shouldBeConnected else { break }
+                await self.connect()
+                if case .listening = await self.state { break }
+                delay = min(delay * 2, 15)
+            }
+            await self?.clearReconnectTask()
+        }
+    }
+
+    private func clearReconnectTask() {
+        reconnectTask = nil
+    }
+
     func disconnect() async {
+        shouldBeConnected = false
+        reconnectTask?.cancel()
+        reconnectTask = nil
         await disarmMicrophone()
         await room.disconnect()
         state = .idle
@@ -214,7 +250,10 @@ extension CommsClient: RoomDelegate {
             switch state {
             case .connected: self.state = .listening
             case .reconnecting: self.state = .reconnecting
-            case .disconnected: if self.state != .idle { self.state = .reconnecting }
+            case .disconnected:
+                if self.shouldBeConnected {
+                    self.scheduleReconnect(reason: "connection lost")
+                }
             default: break
             }
         }

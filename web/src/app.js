@@ -30,6 +30,12 @@ const room = new Room({ adaptiveStream: false, dynacast: false });
 let connected = false;
 let talking = false;
 let armed = false;
+/** Set while the user means to be on comms. A drop is only worth retrying if
+ *  nobody pressed Leave. */
+let shouldBeConnected = false;
+let reconnectTimer = null;
+let reconnectDelay = 1000;
+let micError = null;
 
 const NEEDS_MIC = (mode) => mode !== "listenOnly";
 
@@ -92,7 +98,7 @@ function renderResolved() {
 
 function renderTalk() {
   const mode = els.talkMode.value;
-  els.talkWrap.hidden = !connected || mode === "open" || !NEEDS_MIC(mode);
+  els.talkWrap.hidden = !connected || mode === "open" || !NEEDS_MIC(mode) || micError !== null;
   els.talk.dataset.talking = String(talking);
   els.talkCaption.textContent =
     mode === "pushToTalk"
@@ -126,12 +132,15 @@ async function join() {
   }
 
   saveSettings();
+  shouldBeConnected = true;
+  micError = null;
   setState("connecting", "Connecting…");
 
   try {
     const { url, token } = await fetchCredentials(settings);
     await room.connect(url, token);
     connected = true;
+    reconnectDelay = 1000;
     setState("listening", "On comms", describeRoom());
 
     // Arm now, not on the first press. The first setMicrophoneEnabled has to
@@ -146,15 +155,52 @@ async function join() {
       error instanceof TypeError
         ? "Can't reach the comms server. Check you're on the comms Wi-Fi."
         : error.message;
-    setState("failed", "Not connected", message);
+
+    if (shouldBeConnected) {
+      scheduleReconnect(message);
+    } else {
+      setState("failed", "Not connected", message);
+    }
   }
 }
 
+/** Retries with backoff. An access-point roam, a server restart, or a laptop
+ *  waking all drop the room; without this the client sits on "Not connected"
+ *  until somebody notices and taps Join. */
+function scheduleReconnect(reason) {
+  if (!shouldBeConnected || reconnectTimer) return;
+
+  connected = false;
+  setState("connecting", "Reconnecting…", reason ?? "");
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    if (!shouldBeConnected) return;
+    reconnectDelay = Math.min(reconnectDelay * 2, 15000);
+    await join();
+  }, reconnectDelay);
+}
+
+function cancelReconnect() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  reconnectDelay = 1000;
+}
+
 async function leave() {
+  shouldBeConnected = false;
+  cancelReconnect();
   await disarmMicrophone();
   await room.disconnect();
   connected = false;
+  clearAudioSinks();
   setState("idle", "Not connected");
+}
+
+/** Remote audio elements outlive a dropped connection otherwise, leaving a
+ *  dead <audio> per outage. */
+function clearAudioSinks() {
+  document.querySelectorAll("#sinks audio").forEach((el) => el.remove());
 }
 
 async function armMicrophone() {
@@ -170,7 +216,12 @@ async function armMicrophone() {
     await room.localParticipant.setMicrophoneEnabled(false);
     armed = true;
   } catch (error) {
-    setState("failed", "Microphone blocked", error.message);
+    // Not being able to talk is not the same as not being on comms. Someone
+    // with a denied or missing microphone should still hear the console
+    // rather than be told the connection failed.
+    armed = false;
+    micError = error.message;
+    setState("listening", "On comms", `Listening only — microphone unavailable (${error.message})`);
   }
 }
 
@@ -215,7 +266,10 @@ room.on(RoomEvent.Reconnected, () => setState("listening", "On comms"));
 room.on(RoomEvent.Disconnected, () => {
   connected = false;
   talking = false;
-  setState("idle", "Not connected");
+  armed = false;
+  clearAudioSinks();
+  if (shouldBeConnected) scheduleReconnect("Connection lost");
+  else setState("idle", "Not connected");
 });
 
 // An audio element per remote track. Browsers will not start these without a

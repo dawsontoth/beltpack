@@ -178,6 +178,19 @@ out is `.playAndRecord` with `.allowBluetoothA2DP` (not `.allowBluetooth`) plus
 `setPreferredInput()` forced to the built-in mic, so output stays in AAC and
 you talk into the phone you are already holding.
 
+## Reconnection
+
+All three clients retry a dropped connection with backoff, capped at 15s, and
+stop as soon as somebody deliberately leaves. This matters more than it sounds:
+an unassisted access-point roam is the failure most likely to happen in
+practice, and before this a dropped connection was permanent — the bridge in
+particular stayed alive, connected to nothing, publishing nothing, and silent
+about it, which looks healthy from the outside while comms is dead.
+
+A failed microphone no longer presents as a failed connection either. Someone
+whose mic is denied or missing still hears the console; the client says so and
+hides the talk control rather than claiming comms is down.
+
 ## Known issue: virtual audio devices
 
 Some virtual devices (ZoomAudioDevice is one) advertise a perfectly valid

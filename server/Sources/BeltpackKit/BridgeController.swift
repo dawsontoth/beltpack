@@ -24,10 +24,14 @@ public final class BridgeController: ObservableObject {
         case stopped
         case starting
         case running
+        case reconnecting
         case failed(String)
 
-        public var isBusy: Bool { self == .starting }
+        public var isBusy: Bool { self == .starting || self == .reconnecting }
         public var isRunning: Bool { self == .running }
+        /// Whether the bridge believes it should be on air, whether or not it
+        /// currently is. Used to decide if a drop deserves a retry.
+        public var wantsToRun: Bool { self != .stopped }
     }
 
     @Published public private(set) var runState: RunState = .stopped
@@ -50,6 +54,11 @@ public final class BridgeController: ObservableObject {
     // the unified log, readable with:
     //   log stream --predicate 'subsystem == "org.beltpack"'
     private let log = Logger(subsystem: "org.beltpack", category: "bridge")
+
+    /// Set while the bridge is meant to be on air. A drop is only worth
+    /// retrying if nobody asked it to stop.
+    private var shouldRun = false
+    private var reconnectTask: Task<Void, Never>?
 
     public init() {
         room.add(delegate: self)
@@ -89,6 +98,11 @@ public final class BridgeController: ObservableObject {
 
     public func start() async {
         guard case .stopped = runState else { return }
+        shouldRun = true
+        await connectAndPublish()
+    }
+
+    private func connectAndPublish() async {
         guard let config else {
             log.error("start refused: no configuration loaded")
             runState = .failed("No configuration loaded.")
@@ -138,12 +152,55 @@ public final class BridgeController: ObservableObject {
             refreshParticipants()
         } catch {
             log.error("start failed: \(error.localizedDescription, privacy: .public)")
-            runState = .failed(error.localizedDescription)
             await room.disconnect()
+            // A server that is down now may be up in a moment; only give up
+            // for good if somebody asked us to stop.
+            if shouldRun {
+                scheduleReconnect(reason: error.localizedDescription)
+            } else {
+                runState = .failed(error.localizedDescription)
+            }
         }
     }
 
+    /// Retries with backoff. A LiveKit restart, a Mac waking, or services
+    /// coming up in the wrong order all leave the bridge connected to nothing;
+    /// without this it sits there looking healthy while comms is dead.
+    private func scheduleReconnect(reason: String) {
+        guard shouldRun, reconnectTask == nil else { return }
+        runState = .reconnecting
+        log.error("disconnected (\(reason, privacy: .public)) — retrying")
+
+        reconnectTask = Task { [weak self] in
+            var delay: Double = 1
+            while true {
+                if Task.isCancelled { break }
+                try? await Task.sleep(for: .seconds(delay))
+
+                guard let self, await self.shouldRun else { break }
+                await self.attemptReconnect()
+                if await self.runState.isRunning { break }
+
+                delay = min(delay * 2, 15)
+            }
+            await self?.clearReconnectTask()
+        }
+    }
+
+    private func attemptReconnect() async {
+        log.notice("reconnect attempt")
+        await connectAndPublish()
+    }
+
+    private func clearReconnectTask() {
+        reconnectTask = nil
+    }
+
     public func stop() async {
+        shouldRun = false
+        reconnectTask?.cancel()
+        reconnectTask = nil
+
         if let publication {
             try? await room.localParticipant.unpublish(publication: publication)
         }
@@ -151,6 +208,7 @@ public final class BridgeController: ObservableObject {
         await room.disconnect()
         participants = []
         runState = .stopped
+        log.notice("stopped")
     }
 
     // MARK: - Participants
@@ -203,9 +261,10 @@ extension BridgeController: RoomDelegate {
 
     public nonisolated func room(_: Room, didDisconnectWithError error: LiveKitError?) {
         Task { @MainActor in
-            if let error, self.runState.isRunning {
-                self.runState = .failed(error.localizedDescription)
-            }
+            guard self.shouldRun else { return }
+            self.publication = nil
+            self.participants = []
+            self.scheduleReconnect(reason: error?.localizedDescription ?? "connection lost")
         }
     }
 }
