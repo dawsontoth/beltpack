@@ -83,8 +83,16 @@ enum AudioDevices {
         return device
     }
 
+    static func currentDefaultOutput() -> AudioObjectID? {
+        currentDefault(.output)
+    }
+
     static func currentDefaultInput() -> AudioObjectID? {
-        var addr = defaultDeviceAddress(.input)
+        currentDefault(.input)
+    }
+
+    private static func currentDefault(_ direction: AudioDirection) -> AudioObjectID? {
+        var addr = defaultDeviceAddress(direction)
         var id = AudioObjectID(0)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &id) == noErr else {

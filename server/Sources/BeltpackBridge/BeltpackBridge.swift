@@ -8,6 +8,11 @@ import LiveKit
 @main
 struct BeltpackBridge {
     static func main() async {
+        // stdout is block-buffered when it points at a file, which under
+        // launchd means the log stays empty until the buffer fills — exactly
+        // when you most need to read it. Line-buffer it instead.
+        setvbuf(stdout, nil, _IOLBF, 0)
+
         // `--devices` lists Core Audio inputs and exits, so you can find the
         // WING's exact name without booting the whole bridge.
         if CommandLine.arguments.contains("--devices") {
@@ -34,13 +39,23 @@ struct BeltpackBridge {
             print("No Core Audio input devices found.")
             return
         }
-        let current = AudioDevices.currentDefaultInput()
+        let currentIn = AudioDevices.currentDefaultInput()
         print("Core Audio inputs (\(devices.count)):")
         for device in devices {
-            let marker = device.id == current ? "  (current default)" : ""
+            let marker = device.id == currentIn ? "  (current default)" : ""
             // Channel count is how you spot the console at a glance: the WING
             // reports 48 in, everything else on a Mac reports 1 or 2.
             print("  \(device.name)  —  \(device.channels) in\(marker)")
+        }
+
+        // Outputs matter once BELTPACK_SUBSCRIBE is on: that is where the
+        // summed phone audio goes back to the console.
+        let outputs = AudioDevices.list(.output)
+        let currentOut = AudioDevices.currentDefaultOutput()
+        print("\nCore Audio outputs (\(outputs.count)):")
+        for device in outputs {
+            let marker = device.id == currentOut ? "  (current default)" : ""
+            print("  \(device.name)  —  \(device.channels) out\(marker)")
         }
     }
 
