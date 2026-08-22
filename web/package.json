@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Beltpack PWA for Android phones and booth laptops",
+  "license": "ISC",
   "scripts": {
     "build": "esbuild src/app.js --bundle --format=esm --minify --outfile=dist/app.js",
     "watch": "esbuild src/app.js --bundle --format=esm --outfile=dist/app.js --watch",

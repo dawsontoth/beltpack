@@ -94,3 +94,7 @@ monitoring themselves.
 | 7881 | LiveKit RTC over TCP (fallback) |
 | 7882 | LiveKit RTC over UDP (where audio actually flows) |
 | 7883 | Token service (loopback) |
+
+## License
+
+ISC, same as [announcer](https://github.com/dawsontoth/announcer).
