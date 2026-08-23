@@ -37,15 +37,23 @@ final class WatchLink: NSObject, ObservableObject {
         lastError = nil
         session.sendMessage(
             [CommsLink.actionKey: action.rawValue],
-            replyHandler: { [weak self] reply in
-                Task { @MainActor in
-                    if let snapshot = CommsSnapshot.decoded(from: reply) {
-                        self?.snapshot = snapshot
-                    }
-                }
+            // @Sendable is load-bearing. These closures are non-Sendable
+            // parameters written inside a @MainActor method, so without it they
+            // inherit main-actor isolation — while WatchConnectivity calls them
+            // back on its own operation queue. Swift 6 checks the executor on
+            // entry and traps, so the app launched, reached the phone, and died
+            // the instant the first reply arrived.
+            //
+            // Being nonisolated, they must also reduce the reply to something
+            // Sendable before hopping: [String: Any] cannot cross, CommsSnapshot
+            // and String can.
+            replyHandler: { @Sendable [weak self] reply in
+                let snapshot = CommsSnapshot.decoded(from: reply)
+                Task { @MainActor in self?.apply(snapshot) }
             },
-            errorHandler: { [weak self] error in
-                Task { @MainActor in self?.lastError = error.localizedDescription }
+            errorHandler: { @Sendable [weak self] error in
+                let message = error.localizedDescription
+                Task { @MainActor in self?.lastError = message }
             },
         )
     }
