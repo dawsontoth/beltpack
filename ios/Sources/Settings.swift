@@ -13,11 +13,13 @@ enum Settings {
         static let serverURL = "beltpack.serverURL"
         static let identity = "beltpack.identity"
         static let passcode = "beltpack.passcode"
-        static let micMode = "beltpack.micMode"
         static let talkMode = "beltpack.talkMode"
         static let listenVolume = "beltpack.listenVolume"
         static let micGain = "beltpack.micGain"
         static let muteTone = "beltpack.muteTone"
+        static let outputMode = "beltpack.outputMode"
+        static let micInput = "beltpack.micInput"
+        static let presets = "beltpack.presets"
     }
 
     static let defaultServerURL = "https://comms.example.org"
@@ -35,13 +37,6 @@ enum Settings {
     static var passcode: String {
         get { UserDefaults.standard.string(forKey: Key.passcode) ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: Key.passcode) }
-    }
-
-    /// Defaults to the headset: on comms, latency and free hands beat fidelity.
-    /// Switch to `.phoneMic` when sound quality matters more than either.
-    static var micMode: MicMode {
-        get { MicMode(rawValue: UserDefaults.standard.string(forKey: Key.micMode) ?? "") ?? .headsetMic }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: Key.micMode) }
     }
 
     static var talkMode: TalkMode {
@@ -80,6 +75,36 @@ enum Settings {
     static var muteTone: Bool {
         get { UserDefaults.standard.object(forKey: Key.muteTone) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: Key.muteTone) }
+    }
+
+    static var outputMode: AudioOutputMode {
+        get { AudioOutputMode(rawValue: UserDefaults.standard.string(forKey: Key.outputMode) ?? "") ?? .automatic }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: Key.outputMode) }
+    }
+
+    static var micInput: MicInput {
+        get { MicInput(stored: UserDefaults.standard.string(forKey: Key.micInput) ?? "") }
+        set { UserDefaults.standard.set(newValue.stored, forKey: Key.micInput) }
+    }
+
+    /// The announcement buttons. Editable, because every room has its own
+    /// shorthand and a preset somebody would not say is just a button in the
+    /// way.
+    static var presets: [String] {
+        get {
+            let stored = UserDefaults.standard.stringArray(forKey: Key.presets)
+            return stored ?? AnnouncementPreset.defaults
+        }
+        set {
+            let cleaned = newValue
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            UserDefaults.standard.set(cleaned, forKey: Key.presets)
+        }
+    }
+
+    static func resetPresets() {
+        UserDefaults.standard.removeObject(forKey: Key.presets)
     }
 
     static var isConfigured: Bool {

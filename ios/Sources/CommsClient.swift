@@ -131,8 +131,23 @@ final class CommsClient: ObservableObject {
         applyListenVolume()
     }
 
+    /// Silent mode is enforced here rather than by routing: iOS will not let an
+    /// app refuse an output, but a track at zero makes no sound wherever it
+    /// would have gone.
+    private func applyOutputMode(on session: AVAudioSession) {
+        switch Settings.outputMode {
+        case .speaker: try? session.overrideOutputAudioPort(.speaker)
+        case .automatic, .silent: try? session.overrideOutputAudioPort(.none)
+        }
+        applyListenVolume()
+    }
+
+    func applyRoutingPreferences() {
+        applyOutputMode(on: AVAudioSession.sharedInstance())
+    }
+
     private func applyListenVolume() {
-        let volume = Settings.listenVolume
+        let volume = Settings.outputMode == .silent ? 0 : Settings.listenVolume
         for participant in room.remoteParticipants.values {
             for publication in participant.audioTracks {
                 (publication.track as? RemoteAudioTrack)?.volume = volume
@@ -169,7 +184,7 @@ final class CommsClient: ObservableObject {
             // all cost time, and the session switch drags Bluetooth from A2DP
             // to HFP — well over a second on real earbuds. Doing it here means
             // a press is only ever an unmute.
-            if Settings.talkMode.needsMicrophone {
+            if Settings.talkMode.needsMicrophone, !Settings.micInput.isOff {
                 await armMicrophone()
             }
             if Settings.talkMode == .open {
@@ -226,26 +241,36 @@ final class CommsClient: ObservableObject {
     /// Listen-only stays on `.playback`, which keeps the earbuds in A2DP/AAC
     /// at full bandwidth. Once a mic is involved the category has to become
     /// `.playAndRecord`, and the options then decide whether the earbuds keep
-    /// their quality — see `MicMode`.
+    /// their quality — see `AudioRouting`.
     private func configureAudioSession(forTalking: Bool) throws {
         let session = AVAudioSession.sharedInstance()
 
         if forTalking {
-            let mode = Settings.micMode
-            try session.setCategory(.playAndRecord, mode: mode.sessionMode, options: mode.sessionOptions)
+            let chosen: AVAudioSessionPortDescription?
+            switch Settings.micInput {
+            case .off, .automatic: chosen = nil
+            case let .port(uid): chosen = AudioRouting.port(matching: uid)
+            }
+
+            try session.setCategory(
+                .playAndRecord,
+                mode: AudioRouting.sessionMode(for: chosen),
+                options: AudioRouting.sessionOptions(for: chosen),
+            )
             try session.setActive(true)
-            if mode == .phoneMic {
-                // The decisive step. Without pinning input to the built-in mic
-                // iOS will happily route input to the earbuds anyway, drag the
-                // link into HFP, and undo the whole point of this mode.
-                if let builtIn = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
-                    try? session.setPreferredInput(builtIn)
-                }
+
+            // The decisive step for a non-Bluetooth choice: without pinning the
+            // input, iOS routes it to the earbuds anyway, drags the link into
+            // hands-free mode, and undoes the point of choosing.
+            if let chosen {
+                try? session.setPreferredInput(chosen)
             }
         } else {
             try session.setCategory(.playback, mode: .spokenAudio, options: [])
             try session.setActive(true)
         }
+
+        applyOutputMode(on: session)
 
         if #available(iOS 14.5, *) {
             try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
@@ -343,6 +368,9 @@ final class CommsClient: ObservableObject {
     /// unmute rather than a track negotiation.
     private func armMicrophone() async {
         guard micPublication == nil else { return }
+        // A device set to never listen stays that way, no matter which talk
+        // mode is selected.
+        guard !Settings.micInput.isOff else { return }
 
         guard await AVAudioApplication.requestRecordPermission() else {
             micDenied = true

@@ -37,7 +37,8 @@ struct Announcement: Codable, Identifiable, Equatable, Sendable {
 /// long phrase takes long enough to speak that it stops being a cue and starts
 /// being an interruption.
 enum AnnouncementPreset {
-    static let all: [String] = [
+    /// Starting point only — these are editable per phone.
+    static let defaults: [String] = [
         "Standby",
         "We are live",
         "Two minutes",

@@ -60,7 +60,28 @@ The cost of arming is that the earbuds sit in hands-free mode for the whole
 service rather than only while you talk. **Listen only** is the mode for anyone
 who never talks: it never arms, so Bluetooth stays in A2DP at full quality.
 
-Two microphone modes, and the choice is a real trade rather than a preference.
+Speaker and microphone are both chosen in Settings, and both can be turned
+**off** — which is the point of having them: a position that should see cues
+without ever adding sound to the room, or a phone that listens without being
+able to talk.
+
+Silent output is done by muting the incoming tracks rather than by picking a
+route. iOS will not let an app refuse an output; it can follow the system route
+or force the built-in speaker, and that is all. A track at zero makes no sound
+wherever it would have gone.
+
+The microphone picker lists the real input ports and stores the choice by UID,
+so it survives a headset being unplugged and plugged back in. It also replaced
+a separate phone-versus-headset setting, because the two were the same decision
+wearing different clothes: asking for a Bluetooth port is what drags the link
+into hands-free mode. Choosing the microphone now decides that quietly and
+consistently, rather than letting somebody set the two settings against each
+other.
+
+The announcement buttons are editable — every room has its own shorthand, and a
+preset nobody would say is just a button in the way.
+
+The microphone choice is a real trade rather than a preference.
 Asking iOS for the **headset mic** forces Bluetooth into hands-free mode: both
 directions drop to 16 kHz mono, the console feed included, in exchange for
 roughly 30 ms of latency and the use of both hands. The **phone mic** keeps the

@@ -1,3 +1,4 @@
+import AVFAudio
 import SwiftUI
 
 struct SettingsView: View {
@@ -7,9 +8,11 @@ struct SettingsView: View {
     @State private var serverURL = Settings.serverURL
     @State private var identity = Settings.identity
     @State private var passcode = Settings.passcode
-    @State private var micMode = Settings.micMode
     @State private var talkMode = Settings.talkMode
     @State private var muteTone = Settings.muteTone
+    @State private var outputMode = Settings.outputMode
+    @State private var micInput = Settings.micInput.stored
+    @State private var inputs: [AVAudioSessionPortDescription] = []
 
     var body: some View {
         NavigationStack {
@@ -41,19 +44,35 @@ struct SettingsView: View {
                     }
                 }
                 Section {
+                    Picker("Speaker", selection: $outputMode) {
+                        ForEach(AudioOutputMode.allCases) { Text($0.title).tag($0) }
+                    }
+                } header: {
+                    Text("Listening")
+                } footer: {
+                    Text(outputMode.detail)
+                }
+
+                Section {
                     Picker("When to transmit", selection: $talkMode) {
                         ForEach(TalkMode.allCases) { Text($0.title).tag($0) }
                     }
-                    Picker("Microphone", selection: $micMode) {
-                        ForEach(MicMode.allCases) { Text($0.title).tag($0) }
+                    Picker("Microphone", selection: $micInput) {
+                        Text("Off").tag(MicInput.offValue)
+                        Text("Automatic").tag(MicInput.automaticValue)
+                        ForEach(inputs, id: \.uid) { port in
+                            Text(port.portName).tag(port.uid)
+                        }
                     }
                     Toggle("Mute tone", isOn: $muteTone)
                 } header: {
                     Text("Talking")
                 } footer: {
-                    Text(muteTone
-                        ? "\(micMode.detail)\n\niOS plays a tone each time the microphone mutes and unmutes."
-                        : "\(micMode.detail)\n\nSilent muting. The orange microphone indicator stays lit while you are on comms, because the mic is armed and waiting.")
+                    Text(microphoneFooter)
+                }
+
+                Section {
+                    NavigationLink("Announcement buttons") { PresetsEditor() }
                 }
 
                 Section {
@@ -62,6 +81,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .onAppear { inputs = AudioRouting.availableInputs() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -71,10 +91,12 @@ struct SettingsView: View {
                             ?? serverURL.trimmingCharacters(in: .whitespaces)
                         Settings.identity = identity.trimmingCharacters(in: .whitespaces)
                         Settings.passcode = passcode
-                        Settings.micMode = micMode
                         Settings.talkMode = talkMode
+                        Settings.outputMode = outputMode
+                        Settings.micInput = MicInput(stored: micInput)
                         Settings.muteTone = muteTone
                         comms.applyMuteTonePreference()
+                        comms.applyRoutingPreferences()
                         dismiss()
                         // Apply immediately: someone switching mode
                         // mid-service should not have to rejoin.
@@ -86,5 +108,29 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+private extension SettingsView {
+    var microphoneFooter: String {
+        var lines: [String] = []
+
+        switch MicInput(stored: micInput) {
+        case .off:
+            lines.append("Never listens. No talking and no microphone indicator, and Bluetooth stays in high quality the whole time.")
+        case .automatic:
+            lines.append("Whatever iOS picks, which usually means a connected headset — and that drops both directions to call quality while you are on comms.")
+        case let .port(uid):
+            let port = AudioRouting.port(matching: uid)
+            lines.append(port.map(AudioRouting.isBluetooth) == true
+                ? "A Bluetooth microphone drops both directions to call quality while you are on comms."
+                : "Keeps the earbuds in high quality, but you talk into the phone.")
+        }
+
+        lines.append(muteTone
+            ? "iOS plays a tone each time the microphone mutes and unmutes."
+            : "Silent muting. The orange microphone indicator stays lit while you are on comms, because the mic is armed and waiting.")
+
+        return lines.joined(separator: "\n\n")
     }
 }

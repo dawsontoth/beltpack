@@ -25,7 +25,7 @@ struct AnnouncementBar: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(AnnouncementPreset.all, id: \.self) { preset in
+                        ForEach(Settings.presets, id: \.self) { preset in
                             Button(preset) {
                                 Task { await comms.announce(preset) }
                             }
