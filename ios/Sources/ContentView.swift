@@ -62,7 +62,6 @@ struct ContentView: View {
                         .background(.bar)
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: comms.announcement)
             .navigationTitle("Beltpack")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -88,16 +87,6 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
-            }
-        }
-        // On the NavigationStack, not its content: applied inside, the inset
-        // lands above the navigation bar and rides over the status bar.
-        .safeAreaInset(edge: .top) {
-            if let announcement = comms.announcement {
-                AnnouncementBanner(announcement: announcement)
-                    .id(announcement.id)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
             }
         }
     }

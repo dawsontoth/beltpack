@@ -73,12 +73,12 @@ final class CommsClient: ObservableObject {
     private lazy var listenProcessor = GainProcessor(path: .render, store: Self.sharedLevels.store, gain: 1)
     private let speech = SpeechInjector()
 
-    /// The most recent announcement from anyone, including your own, so every
-    /// phone shows the same thing.
+    /// The most recent announcement, kept only so the sender can see what
+    /// they sent. Everyone else is told by notification.
     @Published private(set) var announcement: Announcement?
+    let notifier = AnnouncementNotifier()
     @Published private(set) var isAnnouncing = false
     private var announcementTask: Task<Void, Never>?
-    private var bannerTask: Task<Void, Never>?
 
     private var micTrack: LocalAudioTrack?
     private var micPublication: LocalTrackPublication?
@@ -162,6 +162,7 @@ final class CommsClient: ObservableObject {
                 roomOptions: RoomOptions(adaptiveStream: false, dynacast: false),
             )
             state = .listening
+            Task { await notifier.requestAuthorisation() }
 
             // Arm the microphone now, not on the first press. Creating the
             // track, switching the audio session, and negotiating the publish
@@ -263,7 +264,7 @@ final class CommsClient: ObservableObject {
         guard !trimmed.isEmpty, case .listening = state else { return }
 
         let item = Announcement(text: trimmed, sender: Settings.identity)
-        show(item)
+        announcement = item
         broadcast(item)
 
         // An announcement needs the microphone even in listen-only, since that
@@ -294,17 +295,11 @@ final class CommsClient: ObservableObject {
         }
     }
 
-    /// Shows an announcement and clears it after a while. A cue from ten
-    /// minutes ago sitting on screen is worse than none: it stops being
-    /// information and starts being furniture.
-    private func show(_ item: Announcement) {
-        announcement = item
-        bannerTask?.cancel()
-        bannerTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(20))
-            guard !Task.isCancelled else { return }
-            await MainActor.run { self?.announcement = nil }
-        }
+    /// Dismisses delivered announcements from the lock screen and Notification
+    /// Centre, for somebody who has read them and wants the phone clean.
+    func clearAnnouncements() {
+        announcement = nil
+        notifier.clearAll()
     }
 
     func stopAnnouncement() async {

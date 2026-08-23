@@ -178,8 +178,8 @@ select {
 #banner {
   width: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 10px;
   padding: 12px 14px;
   border-radius: 10px;
   background: #f2c14e;
@@ -188,3 +188,20 @@ select {
 
 #banner-text { margin: 0; font-weight: 600; font-size: 1.05rem; }
 #banner-from { margin: 0; font-size: 0.75rem; opacity: 0.7; }
+
+.banner-body { flex: 1; min-width: 0; }
+
+#clear-banner {
+  flex: none;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #14181f;
+  background: rgba(0, 0, 0, 0.14);
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+#clear-banner:focus-visible { outline: 2px solid #14181f; outline-offset: 2px; }

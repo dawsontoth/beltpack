@@ -26,6 +26,7 @@ const els = {
   identity: document.querySelector("#identity"),
   passcode: document.querySelector("#passcode"),
   banner: document.querySelector("#banner"),
+  clearBanner: document.querySelector("#clear-banner"),
   bannerText: document.querySelector("#banner-text"),
   bannerFrom: document.querySelector("#banner-from"),
 };
@@ -153,6 +154,7 @@ async function join() {
     // mute, because stopMicTrackOnMute defaults to false.
     if (NEEDS_MIC(settings.talkMode)) await armMicrophone();
     if (settings.talkMode === "open") await startTalking();
+    askForNotifications();
   } catch (error) {
     connected = false;
     // A failed fetch on a LAN almost always means the wrong Wi-Fi.
@@ -275,17 +277,64 @@ room.on(RoomEvent.DataReceived, (payload, _participant, _kind, topic) => {
   try {
     const item = JSON.parse(new TextDecoder().decode(payload));
     if (!item?.text) return;
-    els.bannerText.textContent = item.text;
-    els.bannerFrom.textContent = item.sender || "Announcement";
-    els.banner.hidden = false;
-    // Clear it after a while: a cue from ten minutes ago stops being
-    // information and becomes furniture.
-    clearTimeout(bannerTimer);
-    bannerTimer = setTimeout(() => { els.banner.hidden = true; }, 20000);
+    showAnnouncement(item);
   } catch {
     // A malformed announcement is not worth taking the client down for.
   }
 });
+
+/** A notification if the browser will give us one, the in-app banner if not.
+ *  Android needs a service worker registration to show notifications, and that
+ *  registration can fail for reasons that have nothing to do with us — so the
+ *  banner stays as the path that always works. */
+async function showAnnouncement(item) {
+  els.bannerText.textContent = item.text;
+  els.bannerFrom.textContent = item.sender || "Announcement";
+  els.banner.hidden = false;
+
+  const notified = await notify(item);
+  if (!notified) return;
+
+  // The notification is doing the work; the banner does not need to linger.
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { els.banner.hidden = true; }, 8000);
+}
+
+async function notify(item) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return false;
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (!registration) return false;
+    await registration.showNotification(item.text, {
+      body: item.sender || "Announcement",
+      tag: item.id,
+      renotify: false,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Asked once on comms, not at page load: the permission makes sense to
+ *  somebody who has just joined a channel and none to somebody typing an
+ *  address. */
+async function askForNotifications() {
+  if (!("Notification" in window) || Notification.permission !== "default") return;
+  try { await Notification.requestPermission(); } catch { /* declined is fine */ }
+}
+
+async function clearAnnouncements() {
+  els.banner.hidden = true;
+  clearTimeout(bannerTimer);
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    const shown = (await registration?.getNotifications()) ?? [];
+    shown.forEach((n) => n.close());
+  } catch {
+    // Nothing to clear is not a failure.
+  }
+}
 
 room.on(RoomEvent.Reconnecting, () => setState("connecting", "Reconnecting…"));
 room.on(RoomEvent.Reconnected, () => setState("listening", "On comms"));
@@ -325,6 +374,7 @@ els.form.addEventListener("submit", (event) => {
   saveSettings();
 });
 els.server.addEventListener("input", renderResolved);
+els.clearBanner.addEventListener("click", clearAnnouncements);
 els.talkMode.addEventListener("change", async () => {
   saveSettings();
   const mode = els.talkMode.value;

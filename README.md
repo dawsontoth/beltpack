@@ -237,9 +237,25 @@ Preset buttons speak a short cue over comms and show its text on every phone in
 the room. Free text is there underneath for anything the presets do not cover.
 
 Two paths for one event, deliberately. The speech rides the sender's existing
-microphone track; the text goes over the room's data channel. Somebody in
-listen-only, or with one earbud in a loud room, still needs to see that a cue
-went out even though they will not hear it.
+microphone track; the text arrives as a **local notification** on every other
+phone. An in-app banner would have been invisible to the person who most needs
+it — a camera operator with the phone pocketed and the screen off — so the text
+goes to the lock screen instead, and stays in Notification Centre until it is
+dismissed. iOS suppresses notifications while an app is in front, which is
+wrong here: somebody staring at the talk button still needs to see a cue, so
+the app presents them anyway.
+
+Permission is asked for once the phone is on comms rather than at launch. It
+makes sense to somebody who has just joined a channel and none to somebody
+typing in a server address.
+
+The bell button beside the text field clears delivered announcements, for
+anyone who has read them and wants the phone clean. You are never notified
+about your own announcement.
+
+The web client uses notifications where the browser allows it and falls back to
+an in-app banner otherwise: Android needs a service worker registration to show
+one, and that registration can fail for reasons unrelated to us.
 
 Getting speech onto the wire took a detour worth knowing about: WebRTC captures
 from the device microphone, not from an arbitrary buffer, so there is no

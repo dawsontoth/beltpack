@@ -45,6 +45,16 @@ struct AnnouncementBar: View {
                     Button("Say", action: send)
                         .buttonStyle(.borderedProminent)
                         .disabled(custom.trimmingCharacters(in: .whitespaces).isEmpty)
+                    // Announcements arrive as notifications and stay until
+                    // dismissed, which is the point — but somebody who has
+                    // read them wants one gesture to clear the lot.
+                    Button {
+                        comms.clearAnnouncements()
+                    } label: {
+                        Image(systemName: "bell.slash")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Clear announcements")
                 }
             }
         }
@@ -55,25 +65,5 @@ struct AnnouncementBar: View {
         custom = ""
         typing = false
         Task { await comms.announce(text) }
-    }
-}
-
-/// The last announcement, shown on every phone in the room.
-struct AnnouncementBanner: View {
-    let announcement: Announcement
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(announcement.text)
-                .font(.headline)
-                .foregroundStyle(.black)
-            Text(announcement.sender.isEmpty ? "Announcement" : announcement.sender)
-                .font(.caption2)
-                .foregroundStyle(.black.opacity(0.65))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.yellow, in: RoundedRectangle(cornerRadius: 10))
-        .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
