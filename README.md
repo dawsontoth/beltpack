@@ -251,19 +251,29 @@ typing in a server address.
 
 ### Waking a locked screen
 
-Announcements post at the `.active` interruption level, which delivers but does
-not reliably light a sleeping screen. `.timeSensitive` does that, and breaks
-through a Focus with it — but it needs the **Time Sensitive Notifications**
-capability enabled on the App ID. Adding the entitlement file alone is not
-enough: automatic signing drops it silently and the build still succeeds, which
-is exactly the kind of failure worth writing down. Enable it in Xcode under
-Signing & Capabilities, then switch the level in `AnnouncementNotifier`.
+Announcements post at `.timeSensitive`, which lights the screen and breaks
+through a Focus. That needs the **Time Sensitive Notifications** capability on
+the App ID, enabled once in Xcode under Signing & Capabilities.
+
+Two traps on the way, both of which build cleanly and fail silently:
+
+* Without the capability, the signed binary simply omits the entitlement. The
+  build succeeds and the notification is quietly downgraded, so check with
+  `codesign -d --entitlements - --xml <app>` rather than trusting a green build.
+* `entitlements:` in `project.yml` needs its `properties:` spelled out.
+  XcodeGen *generates* that file; given only a path it writes an empty dict over
+  whatever Xcode put there, and the result again builds fine and carries
+  nothing.
+
+Changing signing team also blocks an upgrade — iOS rejects it with a
+mismatched-application-identifier error, and the app has to be deleted from the
+phone before it will install.
 
 Note also that a *local* notification can only be posted by code that is
 running. The app stays alive with the screen locked because of the audio
-background mode, but only while audio is genuinely flowing. If announcements
-turn out to be missing entirely while locked rather than merely quiet, the
-answer is a push from the server rather than a louder local notification.
+background mode, but only while audio is genuinely flowing. If announcements go
+missing entirely while locked rather than merely quiet, the answer is a push
+from the server rather than a louder local notification.
 
 The bell button beside the text field clears delivered announcements, for
 anyone who has read them and wants the phone clean. You are never notified

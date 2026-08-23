@@ -65,6 +65,20 @@ targets:
           - CFBundleURLName: org.beltpack.pairing
             CFBundleURLSchemes:
               - beltpack
+    # Xcode writes CODE_SIGN_ENTITLEMENTS into the pbxproj when a capability
+    # is added, and xcodegen regenerates that file — so it has to live here or
+    # the next `make ios` quietly drops it.
+    entitlements:
+      path: Beltpack.entitlements
+      properties:
+        # Lights the screen and breaks through a Focus. A cue that waits for
+        # somebody to check their phone is not a cue.
+        #
+        # The contents must be declared here, not just the path: xcodegen
+        # *generates* this file, and with no properties it writes an empty
+        # dict over whatever Xcode put there — the build still succeeds and
+        # the signed binary silently carries no entitlement.
+        com.apple.developer.usernotifications.time-sensitive: true
     settings:
       base:
         MARKETING_VERSION: "0.1.0"
