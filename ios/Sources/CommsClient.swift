@@ -436,6 +436,26 @@ final class CommsClient: ObservableObject {
 }
 
 extension CommsClient: RoomDelegate {
+    /// Announcements arrive here as text on the data channel. The speech rides
+    /// the sender's audio track separately; this is what reaches somebody
+    /// whose phone is in a pocket.
+    nonisolated func room(
+        _: Room,
+        participant _: RemoteParticipant?,
+        didReceiveData data: Data,
+        forTopic topic: String,
+        encryptionType _: EncryptionType,
+    ) {
+        guard topic == Announcement.topic, let item = Announcement.decoded(data) else { return }
+        Task { @MainActor in
+            self.log.notice("announcement received: \(item.text, privacy: .public)")
+            self.announcement = item
+            // Only for announcements from other people. Notifying somebody
+            // about the cue they just sent is noise.
+            self.notifier.post(item)
+        }
+    }
+
     nonisolated func room(_: Room, didUpdateConnectionState state: ConnectionState, from _: ConnectionState) {
         Task { @MainActor in
             switch state {

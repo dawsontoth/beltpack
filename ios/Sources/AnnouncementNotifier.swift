@@ -26,6 +26,8 @@ final class AnnouncementNotifier: NSObject, ObservableObject {
     func requestAuthorisation() async {
         do {
             isAuthorised = try await centre.requestAuthorization(options: [.alert, .sound])
+            let settings = await centre.notificationSettings()
+            log.notice("notification auth=\(self.isAuthorised, privacy: .public) status=\(settings.authorizationStatus.rawValue, privacy: .public) alert=\(settings.alertSetting.rawValue, privacy: .public)")
         } catch {
             log.error("notification permission failed: \(error.localizedDescription, privacy: .public)")
             isAuthorised = false
@@ -33,11 +35,15 @@ final class AnnouncementNotifier: NSObject, ObservableObject {
     }
 
     func post(_ announcement: Announcement) {
+        log.notice("posting announcement, authorised=\(self.isAuthorised, privacy: .public)")
         let content = UNMutableNotificationContent()
         content.title = announcement.text
         content.body = announcement.sender.isEmpty ? "Announcement" : announcement.sender
         content.sound = .default
-        content.interruptionLevel = .timeSensitive
+        // Not .timeSensitive: that level needs the time-sensitive
+        // entitlement, and without it the request can be rejected outright
+        // rather than quietly downgraded.
+        content.interruptionLevel = .active
 
         // Identified by the announcement, so the same cue arriving twice does
         // not stack up two copies on the lock screen.
@@ -47,9 +53,12 @@ final class AnnouncementNotifier: NSObject, ObservableObject {
             trigger: nil,
         )
         centre.add(request) { [weak self] error in
-            guard let error else { return }
             Task { @MainActor in
-                self?.log.error("could not post announcement: \(error.localizedDescription, privacy: .public)")
+                if let error {
+                    self?.log.error("could not post: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    self?.log.notice("posted announcement notification")
+                }
             }
         }
     }
