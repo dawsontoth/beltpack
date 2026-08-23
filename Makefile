@@ -46,6 +46,10 @@ icons: ## Regenerate every app icon from appicon-raw.png
 ios: ios/Local.xcconfig ## Regenerate and open the iOS Xcode project
 	cd ios && xcodegen generate && open Beltpack.xcodeproj
 
+.PHONY: phone
+phone: ios/Local.xcconfig ## Build and install the app on every connected iPhone
+	./scripts/install-phone.sh
+
 .PHONY: admin
 admin: ## Open the management page
 	@open "http://127.0.0.1:$$(grep '^BELTPACK_ADMIN_PORT' .env | sed -E 's/.*="(.*)"/\1/')/" \

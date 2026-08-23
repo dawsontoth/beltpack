@@ -229,6 +229,21 @@ camera. It is a remote control, not a second client — the phone owns the audio
 session and the earbuds are paired to it, so a watch that joined independently
 would fight for the Bluetooth route.
 
+Installing is `make phone`, which builds for every connected iPhone. The watch
+app rides inside the phone app's bundle — there is nothing separate to install.
+
+The watch app has to be signed under the same team as the phone. If no profile
+exists for `org.beltpack.Beltpack.watchkitapp`, signing quietly falls back to
+any wildcard profile sitting in Xcode's cache, including one belonging to an
+unrelated team. The pair still installs, and then the watch app exits the
+instant it is tapped — with no crash report on the build machine to explain it.
+`make phone` compares the two team prefixes and refuses to install a mismatched
+pair rather than leaving that to be discovered on the wrist.
+
+Creating that profile the first time needs your Apple ID, which `xcodebuild`
+cannot do on its own: open `ios/Beltpack.xcodeproj`, select the BeltpackWatch
+target, and let Signing & Capabilities register the App ID.
+
 ## Reconnection
 
 LiveKit handles short outages itself. Past the point where it gives up — a
