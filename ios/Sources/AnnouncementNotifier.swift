@@ -40,9 +40,12 @@ final class AnnouncementNotifier: NSObject, ObservableObject {
         content.title = announcement.text
         content.body = announcement.sender.isEmpty ? "Announcement" : announcement.sender
         content.sound = .default
-        // Not .timeSensitive: that level needs the time-sensitive
-        // entitlement, and without it the request can be rejected outright
-        // rather than quietly downgraded.
+        // .timeSensitive is what lights the screen and breaks through a Focus,
+        // but it needs the Time Sensitive Notifications capability enabled on
+        // the App ID. Adding the entitlement file is not enough: automatic
+        // signing drops it silently, and the build still succeeds. Until the
+        // capability is enabled in Xcode's Signing & Capabilities, an
+        // unentitled request is worse than none, so this stays .active.
         content.interruptionLevel = .active
 
         // Identified by the announcement, so the same cue arriving twice does

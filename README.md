@@ -249,6 +249,22 @@ Permission is asked for once the phone is on comms rather than at launch. It
 makes sense to somebody who has just joined a channel and none to somebody
 typing in a server address.
 
+### Waking a locked screen
+
+Announcements post at the `.active` interruption level, which delivers but does
+not reliably light a sleeping screen. `.timeSensitive` does that, and breaks
+through a Focus with it — but it needs the **Time Sensitive Notifications**
+capability enabled on the App ID. Adding the entitlement file alone is not
+enough: automatic signing drops it silently and the build still succeeds, which
+is exactly the kind of failure worth writing down. Enable it in Xcode under
+Signing & Capabilities, then switch the level in `AnnouncementNotifier`.
+
+Note also that a *local* notification can only be posted by code that is
+running. The app stays alive with the screen locked because of the audio
+background mode, but only while audio is genuinely flowing. If announcements
+turn out to be missing entirely while locked rather than merely quiet, the
+answer is a push from the server rather than a louder local notification.
+
 The bell button beside the text field clears delivered announcements, for
 anyone who has read them and wants the phone clean. You are never notified
 about your own announcement.
