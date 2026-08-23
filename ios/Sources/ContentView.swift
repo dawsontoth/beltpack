@@ -51,25 +51,40 @@ struct ContentView: View {
 
                 // Pinned: the things somebody reaches for in a hurry should
                 // never be the things that scrolled away.
-                VStack(spacing: 14) {
-                    if isConnected {
-                        AnnouncementBar()
-                            .environmentObject(comms)
-                    }
-                    connectButton
+                if isConnected {
+                    // Pinned: the things somebody reaches for in a hurry
+                    // should never be the things that scrolled away.
+                    AnnouncementBar()
+                        .environmentObject(comms)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .background(.bar)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-                .background(.bar)
             }
             .animation(.easeOut(duration: 0.2), value: comms.announcement)
             .navigationTitle("Beltpack")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                Button { showingSettings = true } label: {
-                    Image(systemName: "gearshape")
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            if isConnected { await comms.disconnect() } else { await comms.connect() }
+                        }
+                    } label: {
+                        Image(systemName: isConnected ? "power.circle.fill" : "power.circle")
+                            .font(.title3)
+                    }
+                    .tint(isConnected ? .green : .secondary)
+                    .disabled(comms.state == .connecting)
+                    .accessibilityLabel(isConnected ? "Leave comms" : "Join comms")
                 }
-                .accessibilityLabel("Settings")
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingSettings = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("Settings")
+                }
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -125,25 +140,6 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
             }
         }
-    }
-
-    private var connectButton: some View {
-        Button {
-            Task {
-                if case .listening = comms.state {
-                    await comms.disconnect()
-                } else {
-                    await comms.connect()
-                }
-            }
-        } label: {
-            Text(isConnected ? "Leave comms" : "Join comms")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(isConnected ? .red : .accentColor)
     }
 
     /// What a camera op actually wants to know at a glance: is the console

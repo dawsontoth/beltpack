@@ -32,6 +32,11 @@ final class CommsClient: ObservableObject {
     /// phone is actually doing rather than what a button was pressed to do.
     let watch = PhoneLink()
 
+    var isConnected: Bool {
+        if case .listening = state { return true }
+        return false
+    }
+
     var snapshot: CommsSnapshot {
         var connected = false
         var status = "Not connected"
