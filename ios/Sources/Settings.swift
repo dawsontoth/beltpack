@@ -17,6 +17,7 @@ enum Settings {
         static let talkMode = "beltpack.talkMode"
         static let listenVolume = "beltpack.listenVolume"
         static let micGain = "beltpack.micGain"
+        static let muteTone = "beltpack.muteTone"
     }
 
     static let defaultServerURL = "https://comms.example.org"
@@ -67,6 +68,18 @@ enum Settings {
         // An absent key reads as 0, which would silently mute somebody.
         guard UserDefaults.standard.object(forKey: key) != nil else { return 1 }
         return UserDefaults.standard.double(forKey: key).clamped(to: gainRange)
+    }
+
+    /// Whether iOS plays its tone when the microphone mutes and unmutes.
+    ///
+    /// Off by default. The tone comes from the SDK's default mute mode, which
+    /// also happens to be the one that reconfigures more on each toggle; the
+    /// silent mode is both quieter and lighter. The visible trade is that the
+    /// orange microphone indicator stays lit while muted — which is arguably
+    /// more honest, since the mic really is armed and waiting.
+    static var muteTone: Bool {
+        get { UserDefaults.standard.object(forKey: Key.muteTone) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: Key.muteTone) }
     }
 
     static var isConfigured: Bool {

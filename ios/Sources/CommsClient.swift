@@ -101,8 +101,21 @@ final class CommsClient: ObservableObject {
         // Metering on the render path, gain on the capture path. Listening
         // level is set per remote track instead, which is the supported API.
         micProcessor.speech = speech
+        applyMuteTonePreference()
         AudioManager.shared.capturePostProcessingDelegate = micProcessor
         AudioManager.shared.renderPreProcessingDelegate = listenProcessor
+    }
+
+    /// `.inputMixer` mutes silently and without reconfiguring the engine;
+    /// `.voiceProcessing` is the SDK default and is what makes iOS play its
+    /// tone. Applied at connect and whenever the setting changes.
+    func applyMuteTonePreference() {
+        let mode: MicrophoneMuteMode = Settings.muteTone ? .voiceProcessing : .inputMixer
+        do {
+            try AudioManager.shared.set(microphoneMuteMode: mode)
+        } catch {
+            log.error("could not set mute mode: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// How loud you are to everyone else.

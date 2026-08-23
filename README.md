@@ -271,9 +271,20 @@ Both are capped at +6 dB rather than the SDK's +20. Past a modest boost you are
 amplifying room noise, and on comms that is everyone's problem rather than only
 your own.
 
-The meters read from the same audio hooks. The send meter dims while you are
-muted, since a meter that moves when nobody can hear you is worse than no meter
-at all.
+The meters read from the same audio hooks, on a dBFS scale rather than a linear
+one: a linear peak meter reads nearly full on ordinary speech and tells you
+nothing. Green to about -12, amber to -3, red above. The send meter dims while
+you are muted, since a meter that moves when nobody can hear you is worse than
+no meter at all.
+
+## The mute tone
+
+iOS plays a tone each time the microphone mutes and unmutes, which on
+push-to-talk means a beep on every press. That comes from the SDK's default
+mute mode; **Settings > Mute tone** switches to the silent one, which also
+avoids reconfiguring the audio engine on each toggle. The visible trade is that
+the orange microphone indicator stays lit while you are on comms — arguably
+more honest, since the mic really is armed and waiting. Silent is the default.
 
 ## Reconnection
 

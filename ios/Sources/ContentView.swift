@@ -314,9 +314,11 @@ private struct Meter: View {
     }
 
     private var colour: Color {
+        // On the dBFS scale the bar now uses, 0.8 is about -12 dBFS and 0.95
+        // about -3: healthy, hot, and too close to clipping.
         switch level {
-        case ..<0.7: .green
-        case ..<0.92: .orange
+        case ..<0.8: .green
+        case ..<0.95: .orange
         default: .red
         }
     }

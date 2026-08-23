@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var passcode = Settings.passcode
     @State private var micMode = Settings.micMode
     @State private var talkMode = Settings.talkMode
+    @State private var muteTone = Settings.muteTone
 
     var body: some View {
         NavigationStack {
@@ -46,10 +47,13 @@ struct SettingsView: View {
                     Picker("Microphone", selection: $micMode) {
                         ForEach(MicMode.allCases) { Text($0.title).tag($0) }
                     }
+                    Toggle("Mute tone", isOn: $muteTone)
                 } header: {
                     Text("Talking")
                 } footer: {
-                    Text(micMode.detail)
+                    Text(muteTone
+                        ? "\(micMode.detail)\n\niOS plays a tone each time the microphone mutes and unmutes."
+                        : "\(micMode.detail)\n\nSilent muting. The orange microphone indicator stays lit while you are on comms, because the mic is armed and waiting.")
                 }
 
                 Section {
@@ -69,6 +73,8 @@ struct SettingsView: View {
                         Settings.passcode = passcode
                         Settings.micMode = micMode
                         Settings.talkMode = talkMode
+                        Settings.muteTone = muteTone
+                        comms.applyMuteTonePreference()
                         dismiss()
                         // Apply immediately: someone switching mode
                         // mid-service should not have to rejoin.

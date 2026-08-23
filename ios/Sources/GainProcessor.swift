@@ -19,6 +19,14 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
     /// replace the microphone's entirely.
     var speech: SpeechInjector?
 
+    /// WebRTC's processing buffers are float, but not always normalised to
+    /// ±1 — some paths carry int16-scaled values. Rather than guess per
+    /// buffer, latch it the first time a sample turns up that float audio
+    /// could not plausibly produce. Guessing per buffer was the bug that
+    /// pinned the meter: anything landing between 1 and 2 was treated as
+    /// full scale.
+    private var usesInt16Scale = false
+
     init(path: Path, store: LevelStore, gain: Float = 1) {
         self.path = path
         self.store = store
@@ -42,44 +50,52 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
     func audioProcessingProcess(audioBuffer: LKAudioBuffer) {
         let gain = self.gain
         var peak: Float = 0
+        var sumOfSquares: Float = 0
+        var counted = 0
 
         // An announcement takes over the buffer rather than mixing with it.
         // Mixing would put room noise and whoever is nearby underneath a cue
         // that is meant to be unambiguous.
-        if let speech, speech.isSpeaking {
-            for channel in 0 ..< audioBuffer.channels {
-                let samples = audioBuffer.rawBuffer(for: channel)
+        let speaking = speech?.isSpeaking == true
+
+        for channel in 0 ..< audioBuffer.channels {
+            let samples = audioBuffer.rawBuffer(for: channel)
+
+            if speaking, let speech {
                 let written = speech.drain(into: samples, frames: audioBuffer.frames)
                 // Silence whatever the microphone had in the rest of the
                 // buffer, so the tail of an announcement is not room tone.
                 for index in written ..< audioBuffer.frames { samples[index] = 0 }
-                for index in 0 ..< audioBuffer.frames {
-                    peak = max(peak, abs(samples[index]))
-                }
             }
-            let scale = peak > 2 ? peak / 32768 : peak
-            store.reportMic(min(scale, 1))
-            return
-        }
 
-        for channel in 0 ..< audioBuffer.channels {
-            let samples = audioBuffer.rawBuffer(for: channel)
             for index in 0 ..< audioBuffer.frames {
-                let value = samples[index] * gain
-                samples[index] = value
-                peak = max(peak, abs(value))
+                let value = speaking ? samples[index] : samples[index] * gain
+                if !speaking { samples[index] = value }
+                let magnitude = abs(value)
+                peak = max(peak, magnitude)
+                sumOfSquares += value * value
             }
+            counted += audioBuffer.frames
         }
 
-        // WebRTC's processing buffers are float but not always normalised to
-        // ±1: some paths carry int16-scaled values. Rather than assume, infer
-        // the scale from the signal itself so the meter is right either way.
-        let normalised = peak > 2 ? peak / 32768 : peak
-        let level = min(normalised, 1)
+        if peak > 4 { usesInt16Scale = true }
+        let divisor: Float = usesInt16Scale ? 32768 : 1
+        let rms = counted > 0 ? (sumOfSquares / Float(counted)).squareRoot() / divisor : 0
 
         switch path {
-        case .capture: store.reportMic(level)
-        case .render: store.reportListen(level)
+        case .capture: store.reportMic(Self.meterLevel(rms))
+        case .render: store.reportListen(Self.meterLevel(rms))
         }
+    }
+
+    /// Maps RMS onto a meter scale in decibels rather than linearly.
+    ///
+    /// A linear peak meter reads nearly full on ordinary speech and tells you
+    /// nothing; -60 dBFS to 0 is the range a person can actually judge a level
+    /// against.
+    private static func meterLevel(_ rms: Float) -> Float {
+        guard rms > 0.00001 else { return 0 }
+        let decibels = 20 * log10(rms)
+        return min(max((decibels + 60) / 60, 0), 1)
     }
 }
