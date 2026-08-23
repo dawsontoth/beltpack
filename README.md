@@ -212,12 +212,20 @@ at all.
 
 ## Reconnection
 
-All three clients retry a dropped connection with backoff, capped at 15s, and
-stop as soon as somebody deliberately leaves. This matters more than it sounds:
-an unassisted access-point roam is the failure most likely to happen in
-practice, and before this a dropped connection was permanent — the bridge in
-particular stayed alive, connected to nothing, publishing nothing, and silent
-about it, which looks healthy from the outside while comms is dead.
+LiveKit's own client reconnection handles short outages by itself, including
+republishing. What it does not handle is an outage long enough for it to give
+up — a console reboot, a server restart during setup, a long roam. Past that
+point every client retries on its own with backoff capped at 15s, stopping as
+soon as somebody deliberately leaves.
+
+Both layers are exercised: a ~15s outage recovers inside the SDK, and an ~85s
+one recovers through the retry loop after the SDK has given up.
+
+The subtle failure is not the connection but the microphone. A publication does
+not survive a drop, so a client that reconnects without re-arming comes back
+able to listen and silently unable to talk — the button looks fine and nothing
+reaches the console. Both clients clear the stale publication on disconnect so
+arming runs again.
 
 A failed microphone no longer presents as a failed connection either. Someone
 whose mic is denied or missing still hears the console; the client says so and

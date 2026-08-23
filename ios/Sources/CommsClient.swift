@@ -286,6 +286,14 @@ extension CommsClient: RoomDelegate {
             case .reconnecting: self.state = .reconnecting
             case .disconnected:
                 if self.shouldBeConnected {
+                    // The publication does not survive the drop. Clearing it
+                    // is what lets arming run again on reconnect — otherwise
+                    // armMicrophone() sees a stale non-nil publication, returns
+                    // early, and the beltpack comes back able to listen but
+                    // silently unable to talk.
+                    self.micPublication = nil
+                    self.micTrack = nil
+                    self.isTalking = false
                     self.scheduleReconnect(reason: "connection lost")
                 }
             default: break
