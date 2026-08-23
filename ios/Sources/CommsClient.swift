@@ -3,6 +3,7 @@ import Combine
 import Foundation
 import LiveKit
 import OSLog
+import WatchConnectivity
 
 /// Joins the comms room and keeps listening while the phone is in a pocket.
 ///
@@ -23,6 +24,29 @@ final class CommsClient: ObservableObject {
     @Published private(set) var consoleIsLive = false
     @Published private(set) var isTalking = false
     @Published private(set) var micDenied = false
+
+    /// Pushed to the watch on every change, so the wrist reflects what the
+    /// phone is actually doing rather than what a button was pressed to do.
+    let watch = PhoneLink()
+
+    var snapshot: CommsSnapshot {
+        var connected = false
+        var status = "Not connected"
+        switch state {
+        case .listening: connected = true; status = isTalking ? "Talking" : "On comms"
+        case .connecting: status = "Connecting…"
+        case .reconnecting: status = "Reconnecting…"
+        case let .failed(message): status = message
+        case .idle: break
+        }
+        return CommsSnapshot(
+            isConnected: connected,
+            isTalking: isTalking,
+            consoleIsLive: consoleIsLive,
+            talkMode: Settings.talkMode.rawValue,
+            status: status,
+        )
+    }
 
     // Read with Console.app, or:
     //   log stream --device --predicate 'subsystem == "org.beltpack"'
@@ -46,8 +70,18 @@ final class CommsClient: ObservableObject {
     private let room = Room()
     private var listenerTask: Task<Void, Never>?
 
+    private var watchSync: AnyCancellable?
+
     init() {
         room.add(delegate: self)
+        watch.attach(to: self)
+
+        // objectWillChange fires before the value lands, so defer a tick and
+        // publish what is actually true. One hook beats a call at every
+        // mutation site, which would eventually miss one.
+        watchSync = objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.syncWatch() }
         // Metering on the render path, gain on the capture path. Listening
         // level is set per remote track instead, which is the supported API.
         AudioManager.shared.capturePostProcessingDelegate = micProcessor
@@ -320,6 +354,12 @@ extension CommsClient: RoomDelegate {
 
     nonisolated func room(_ room: Room, participant _: RemoteParticipant, didUnsubscribeTrack _: RemoteTrackPublication) {
         Task { @MainActor in self.refreshTalkers(room) }
+    }
+
+    @MainActor
+    /// Single place the watch is told anything.
+    func syncWatch() {
+        watch.publish(snapshot)
     }
 
     @MainActor

@@ -10,6 +10,7 @@ DerivedData/
 
 # XcodeGen output (regenerate with `make ios`)
 ios/Info.plist
+ios/Watch/Info.plist
 
 # Node
 node_modules/

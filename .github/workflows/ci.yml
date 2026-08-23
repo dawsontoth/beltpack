@@ -26,12 +26,18 @@ jobs:
       - run: cp ios/Local.xcconfig.example ios/Local.xcconfig
       - run: xcodegen generate
         working-directory: ios
-      - name: Build
+      - name: Build and test
         working-directory: ios
         run: |
           xcodebuild test -project Beltpack.xcodeproj -scheme Beltpack \
             -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
             -configuration Debug CODE_SIGNING_ALLOWED=NO
+      - name: Build watch app
+        working-directory: ios
+        run: |
+          xcodebuild -project Beltpack.xcodeproj -scheme BeltpackWatch \
+            -destination 'generic/platform=watchOS Simulator' \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO build
 
   mac:
     name: Mac host app

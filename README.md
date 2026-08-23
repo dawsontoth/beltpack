@@ -191,6 +191,33 @@ out is `.playAndRecord` with `.allowBluetoothA2DP` (not `.allowBluetooth`) plus
 `setPreferredInput()` forced to the built-in mic, so output stays in AAC and
 you talk into the phone you are already holding.
 
+## The watch
+
+A camera operator has both hands on a camera. Reaching for a pocketed phone to
+press talk is the friction the watch removes: the whole screen is the button,
+pressed without looking, with a haptic on start and stop.
+
+It is a **remote control, not a second client**. The phone owns the LiveKit
+connection and the audio session, and the earbuds are paired to *it* — a watch
+that joined the room independently would fight for the Bluetooth route and could
+drag the earbuds into hands-free mode behind the phone's back. So the watch
+sends intent and renders state it is told; it never decides whether it is
+transmitting. A wrist that shows "talking" because a button was pressed, when
+the phone never opened the mic, is worse than one that shows nothing.
+
+It mirrors the phone's talk modes exactly, and the control is inert in
+listen-only or open-mic, where a button would mean nothing.
+
+`WCSession.sendMessage` only works while the phone app is reachable. That case
+is shown rather than swallowed — the watch says "Open Beltpack on your phone"
+instead of accepting a press that goes nowhere.
+
+The watch app ships embedded in the phone app, so installing the phone app
+carries it across. Its bundle identifier has to be the phone's with
+`.watchkitapp` appended; XcodeGen's prefix rule would otherwise name it
+`org.beltpack.BeltpackWatch`, which looks reasonable and stops the phone app
+installing at all.
+
 ## Personal levels
 
 Each beltpack carries its own trims, because one position always wants the

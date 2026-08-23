@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: org.beltpack
   deploymentTarget:
     iOS: "17.0"
+    watchOS: "10.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
@@ -19,6 +20,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Shared
     dependencies:
       - package: LiveKit
         product: LiveKit
@@ -26,6 +28,8 @@ targets:
       # copy that can drift out of agreement about a link's meaning.
       - package: BeltpackKit
         product: BeltpackKit
+      - target: BeltpackWatch
+        embed: true
     info:
       path: Info.plist
       properties:
@@ -76,6 +80,40 @@ targets:
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+
+  BeltpackWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Watch
+      - path: Shared
+    info:
+      path: Watch/Info.plist
+      properties:
+        CFBundleDisplayName: Beltpack
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: org.beltpack.Beltpack
+    settings:
+      base:
+        # Must be the phone's identifier with .watchkitapp appended, or the
+        # two do not validate as companions and the phone app will not even
+        # install. XcodeGen's bundleIdPrefix would otherwise name this
+        # org.beltpack.BeltpackWatch, which looks reasonable and is wrong.
+        PRODUCT_BUNDLE_IDENTIFIER: org.beltpack.Beltpack.watchkitapp
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "4"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: NO
+        CODE_SIGN_STYLE: Automatic
+    # Same gitignored signing config as the phone, so a team id never lands
+    # in a public repo.
+    configFiles:
+      Debug: Local.xcconfig
+      Release: Local.xcconfig
 
   BeltpackTests:
     type: bundle.unit-test

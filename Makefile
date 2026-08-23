@@ -116,6 +116,9 @@ check: ios/Local.xcconfig ## Build everything and lint what can be linted
 	cd ios && xcodebuild -project Beltpack.xcodeproj -scheme Beltpack \
 		-destination 'generic/platform=iOS Simulator' \
 		-configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -1
+	cd ios && xcodebuild -project Beltpack.xcodeproj -scheme BeltpackWatch \
+		-destination 'generic/platform=watchOS Simulator' \
+		-configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -1
 	cd mac && xcodegen generate
 	cd mac && xcodebuild -project BeltpackHost.xcodeproj -scheme BeltpackHost \
 		-configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -1
