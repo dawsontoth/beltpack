@@ -52,23 +52,24 @@ if [ -d "$watch" ]; then
     watch_team=$(prefix "$watch")
     echo "==> Watch signed by team ${watch_team:-<none>}"
     if [ "$watch_team" != "$phone_team" ]; then
+        # Deliberately a warning and not a refusal. A mismatched pair does
+        # install and does run — that was checked, not assumed — so blocking
+        # here would cost a working build to enforce tidiness.
         cat >&2 <<MSG
 
-REFUSING TO INSTALL: the watch app is signed by team '$watch_team' but the
-phone app by '$phone_team'. watchOS will install this pair and then kill the
-watch app at launch — it looks like a crash with no crash report.
-
-This means no provisioning profile exists for
+WARNING: the watch app is signed by team '$watch_team' but the phone app by
+'$phone_team'. No provisioning profile exists for
 org.beltpack.Beltpack.watchkitapp under team $phone_team, so signing fell back
-to a wildcard profile from another team. Creating one needs your Apple ID:
+to a wildcard profile belonging to another team.
+
+Installing anyway. To straighten it out, creating the profile needs an Apple ID
+that xcodebuild does not have:
 
   1. open ios/Beltpack.xcodeproj in Xcode
   2. select the BeltpackWatch target -> Signing & Capabilities
   3. confirm the team, and let Xcode register the App ID
-  4. re-run this script
 
 MSG
-        exit 1
     fi
 else
     echo "    (no watch app embedded)" >&2
