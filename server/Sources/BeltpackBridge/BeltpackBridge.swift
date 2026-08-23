@@ -190,7 +190,14 @@ struct BeltpackBridge {
             ),
         )
         log("opening \(config.inputDeviceHint) for capture…")
-        _ = try await room.localParticipant.publish(audioTrack: track)
+        _ = try await room.localParticipant.publish(
+            audioTrack: track,
+            // DTX off. It is built for a talking head, and on a programme feed
+            // it replaces silence with periodic comfort noise and clips the
+            // front of anything that follows. A console bus should go out
+            // continuously, quiet passages included.
+            options: AudioPublishOptions(dtx: false),
+        )
     }
 
     private static func waitForDisconnect() async throws {

@@ -19,13 +19,20 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
     /// replace the microphone's entirely.
     var speech: SpeechInjector?
 
-    /// WebRTC's processing buffers are float, but not always normalised to
-    /// ±1 — some paths carry int16-scaled values. Rather than guess per
-    /// buffer, latch it the first time a sample turns up that float audio
-    /// could not plausibly produce. Guessing per buffer was the bug that
-    /// pinned the meter: anything landing between 1 and 2 was treated as
-    /// full scale.
-    private var usesInt16Scale = false
+    /// WebRTC's processing buffers are float, but carry int16-range values on
+    /// most paths rather than ±1. That is the documented convention, so it is
+    /// the default rather than something to be discovered — synthesised speech
+    /// written in at ±1 into an int16-range buffer comes out 90 dB down, which
+    /// is silence with extra steps.
+    ///
+    /// It is still checked against the signal, because not every path agrees:
+    /// a buffer carrying real audio that never exceeds ±1 is float-scaled.
+    private var usesInt16Scale = true
+    private var scaleObserved = false
+
+    /// What full scale means in this buffer, used both for metering and for
+    /// writing speech in at the right level.
+    private var fullScale: Float { usesInt16Scale ? 32768 : 1 }
 
     init(path: Path, store: LevelStore, gain: Float = 1) {
         self.path = path
@@ -63,6 +70,13 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
 
             if speaking, let speech {
                 let written = speech.drain(into: samples, frames: audioBuffer.frames)
+                // The synthesiser produces ±1; the buffer expects whatever
+                // this path uses. Without this the announcement is technically
+                // present and entirely inaudible.
+                let scale = fullScale
+                if scale != 1 {
+                    for index in 0 ..< written { samples[index] *= scale }
+                }
                 // Silence whatever the microphone had in the rest of the
                 // buffer, so the tail of an announcement is not room tone.
                 for index in written ..< audioBuffer.frames { samples[index] = 0 }
@@ -78,9 +92,14 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
             counted += audioBuffer.frames
         }
 
-        if peak > 4 { usesInt16Scale = true }
-        let divisor: Float = usesInt16Scale ? 32768 : 1
-        let rms = counted > 0 ? (sumOfSquares / Float(counted)).squareRoot() / divisor : 0
+        // Decide once, and only on a buffer that actually carries signal:
+        // silence tells you nothing about scale, and announcements overwrite
+        // the buffer so they cannot be used to judge it either.
+        if !speaking, !scaleObserved, peak > 0.001 {
+            usesInt16Scale = peak > 1
+            scaleObserved = true
+        }
+        let rms = counted > 0 ? (sumOfSquares / Float(counted)).squareRoot() / fullScale : 0
 
         switch path {
         case .capture: store.reportMic(Self.meterLevel(rms))
