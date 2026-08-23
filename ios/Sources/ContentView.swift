@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var comms: CommsClient
+    @EnvironmentObject private var presets: PresetStore
     @State private var showingSettings = false
 
     var body: some View {
@@ -56,6 +57,7 @@ struct ContentView: View {
                     // should never be the things that scrolled away.
                     AnnouncementBar()
                         .environmentObject(comms)
+                        .environmentObject(presets)
                         .padding(.horizontal, 24)
                         .padding(.top, 12)
                         .padding(.bottom, 8)
@@ -87,6 +89,8 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+                    .environmentObject(comms)
+                    .environmentObject(presets)
             }
         }
     }

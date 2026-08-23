@@ -5,22 +5,23 @@ import SwiftUI
 @main
 struct BeltpackApp: App {
     @StateObject private var comms = CommsClient()
+    @StateObject private var presets = PresetStore()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(comms)
+                .environmentObject(presets)
                 .onOpenURL { url in
                     // A scanned pairing code. Applied whole or not at all:
                     // PairingLink refuses anything half-configured.
                     guard let link = PairingLink.parse(url) else { return }
-                    Settings.serverURL = link.server
-                    Settings.passcode = link.passcode
-                    if let identity = link.identity, !identity.isEmpty {
-                        Settings.identity = identity
-                    }
-                    Task {
-                        if Settings.isConfigured { await comms.connect() }
+                    let ready = Settings.apply(link)
+                    // Connect straight away when the code carried everything.
+                    // A code without a name leaves the person on the settings
+                    // screen with one field to fill rather than four.
+                    if ready {
+                        Task { await comms.connect() }
                     }
                 }
                 .task {

@@ -73,6 +73,7 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink("Announcement buttons") { PresetsEditor() }
+                    NavigationLink("Pair another phone") { PairAnotherView() }
                 }
 
                 Section {

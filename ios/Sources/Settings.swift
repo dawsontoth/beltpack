@@ -1,3 +1,4 @@
+import BeltpackKit
 import Foundation
 
 /// Where this beltpack points and who it says it is.
@@ -9,7 +10,7 @@ import Foundation
 /// These are computed rather than stored so they stay clear of Swift 6's
 /// global-mutable-state rules; UserDefaults is the actual storage.
 enum Settings {
-    private enum Key {
+    enum Key {
         static let serverURL = "beltpack.serverURL"
         static let identity = "beltpack.identity"
         static let passcode = "beltpack.passcode"
@@ -105,6 +106,29 @@ enum Settings {
 
     static func resetPresets() {
         UserDefaults.standard.removeObject(forKey: Key.presets)
+    }
+
+    /// Applies a scanned pairing code.
+    ///
+    /// Whole or not at all — `PairingLink` refuses a half-configured link, so
+    /// nothing here can leave somebody staring at a form that looks filled in
+    /// and cannot connect. The server is normalised on the way in rather than
+    /// only on the way out, so what Settings shows is what will be used.
+    ///
+    /// Takes a store so it can be tested without trampling the real defaults.
+    @discardableResult
+    static func apply(_ link: PairingLink, to defaults: UserDefaults = .standard) -> Bool {
+        let normalised = ServerAddress.normalize(link.server)?.absoluteString
+            ?? link.server.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        defaults.set(normalised, forKey: Key.serverURL)
+        defaults.set(link.passcode, forKey: Key.passcode)
+        if let identity = link.identity, !identity.isEmpty {
+            defaults.set(identity, forKey: Key.identity)
+        }
+
+        let identity = defaults.string(forKey: Key.identity) ?? ""
+        return !identity.isEmpty && !link.passcode.isEmpty && ServerAddress.normalize(normalised) != nil
     }
 
     static var isConfigured: Bool {

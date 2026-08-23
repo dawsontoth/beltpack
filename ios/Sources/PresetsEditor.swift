@@ -6,7 +6,8 @@ import SwiftUI
 /// button in the way. Kept short deliberately: these get pressed by somebody
 /// holding a camera, and a long phrase stops being a cue.
 struct PresetsEditor: View {
-    @State private var presets = Settings.presets
+    @EnvironmentObject private var store: PresetStore
+    @State private var presets: [String] = []
     @State private var draft = ""
     @FocusState private var typing: Bool
 
@@ -43,11 +44,12 @@ struct PresetsEditor: View {
 
             Section {
                 Button("Restore defaults") {
-                    Settings.resetPresets()
-                    presets = Settings.presets
+                    store.restoreDefaults()
+                    presets = store.presets
                 }
             }
         }
+        .onAppear { presets = store.presets }
         .navigationTitle("Announcements")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { EditButton() }
@@ -66,6 +68,7 @@ struct PresetsEditor: View {
     }
 
     private func save() {
-        Settings.presets = presets
+        store.replace(with: presets)
+        presets = store.presets
     }
 }

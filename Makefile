@@ -72,6 +72,14 @@ devices: ## List Core Audio inputs this Mac can see
 pair: ## Show a pairing code for a volunteer to scan
 	./deploy/run.sh pair
 
+.PHONY: up
+up: ## Start everything: LiveKit, the token service and the host app
+	./scripts/up.sh
+
+.PHONY: down
+down: ## Stop everything
+	./scripts/down.sh
+
 .PHONY: run-livekit
 run-livekit: ## Run the SFU in the foreground
 	./deploy/run.sh livekit

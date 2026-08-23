@@ -7,6 +7,7 @@ import SwiftUI
 /// for the case a preset does not cover.
 struct AnnouncementBar: View {
     @EnvironmentObject private var comms: CommsClient
+    @EnvironmentObject private var presets: PresetStore
     @State private var custom = ""
     @FocusState private var typing: Bool
 
@@ -25,7 +26,7 @@ struct AnnouncementBar: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Settings.presets, id: \.self) { preset in
+                        ForEach(presets.presets, id: \.self) { preset in
                             Button(preset) {
                                 Task { await comms.announce(preset) }
                             }
