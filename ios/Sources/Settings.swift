@@ -127,6 +127,19 @@ enum Settings {
         UserDefaults.standard.removeObject(forKey: Key.presets)
     }
 
+    /// What a scanned code still needs before it can join.
+    enum PairingOutcome: Equatable {
+        /// Everything present. Connect.
+        case ready
+        /// The server and passcode landed and only the name is missing — which
+        /// is every code the host currently produces, since whoever generates
+        /// one cannot know who will scan it.
+        case needsName
+        /// Not joinable whatever is typed, so asking for a name would only
+        /// waste somebody's time at the worst moment to waste it.
+        case unusable
+    }
+
     /// Applies a scanned pairing code.
     ///
     /// Whole or not at all — `PairingLink` refuses a half-configured link, so
@@ -134,9 +147,14 @@ enum Settings {
     /// and cannot connect. The server is normalised on the way in rather than
     /// only on the way out, so what Settings shows is what will be used.
     ///
+    /// Reports which of the two kinds of "not ready" it is, because they need
+    /// opposite things from the person holding the phone. The caller used to
+    /// get a bare false and re-derive the difference from global state, which
+    /// quietly ignored the store passed in here.
+    ///
     /// Takes a store so it can be tested without trampling the real defaults.
     @discardableResult
-    static func apply(_ link: PairingLink, to defaults: UserDefaults = .standard) -> Bool {
+    static func apply(_ link: PairingLink, to defaults: UserDefaults = .standard) -> PairingOutcome {
         let normalised = ServerAddress.normalize(link.server)?.absoluteString
             ?? link.server.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -146,8 +164,9 @@ enum Settings {
             defaults.set(identity, forKey: Key.identity)
         }
 
+        guard !link.passcode.isEmpty, ServerAddress.normalize(normalised) != nil else { return .unusable }
         let identity = defaults.string(forKey: Key.identity) ?? ""
-        return !identity.isEmpty && !link.passcode.isEmpty && ServerAddress.normalize(normalised) != nil
+        return identity.isEmpty ? .needsName : .ready
     }
 
     static var isConfigured: Bool {

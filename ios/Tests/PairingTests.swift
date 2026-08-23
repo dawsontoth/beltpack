@@ -22,7 +22,7 @@ struct PairingTests {
         let defaults = makeDefaults()
         let link = PairingLink(server: "172.16.1.41", passcode: "9qmbutqe38", identity: "Camera 2")
 
-        #expect(Settings.apply(link, to: defaults) == true)
+        #expect(Settings.apply(link, to: defaults) == .ready)
         #expect(defaults.string(forKey: Settings.Key.identity) == "Camera 2")
         #expect(defaults.string(forKey: Settings.Key.passcode) == "9qmbutqe38")
     }
@@ -51,9 +51,11 @@ struct PairingTests {
         let link = PairingLink(server: "10.0.0.5", passcode: "x")
 
         // Not ready — connecting anonymously would put an unnamed position on
-        // comms that nobody can identify.
-        #expect(Settings.apply(link, to: defaults) == false)
+        // comms that nobody can identify. The server and passcode are still
+        // stored, so the app has exactly one thing left to ask for.
+        #expect(Settings.apply(link, to: defaults) == .needsName)
         #expect(defaults.string(forKey: Settings.Key.passcode) == "x")
+        #expect(defaults.string(forKey: Settings.Key.serverURL)?.isEmpty == false)
     }
 
     @Test("an existing name survives a code that does not carry one")
@@ -61,14 +63,25 @@ struct PairingTests {
         let defaults = makeDefaults()
         defaults.set("Camera 3", forKey: Settings.Key.identity)
 
-        #expect(Settings.apply(PairingLink(server: "10.0.0.5", passcode: "x"), to: defaults) == true)
+        #expect(Settings.apply(PairingLink(server: "10.0.0.5", passcode: "x"), to: defaults) == .ready)
         #expect(defaults.string(forKey: Settings.Key.identity) == "Camera 3")
     }
 
-    @Test("a nonsense server is stored but not treated as ready")
+    /// The two ways a code can fail need opposite things from whoever
+    /// scanned it, so they must not collapse into one answer: a missing name
+    /// is worth asking about, a broken server is not.
+    @Test("a nonsense server is unusable rather than merely unnamed")
     func unusableServer() {
         let defaults = makeDefaults()
-        #expect(Settings.apply(PairingLink(server: "ftp://nope", passcode: "x", identity: "Op"), to: defaults) == false)
+        let outcome = Settings.apply(PairingLink(server: "ftp://nope", passcode: "x", identity: "Op"), to: defaults)
+        #expect(outcome == .unusable)
+        #expect(outcome != .needsName)
+    }
+
+    @Test("a nonsense server stays unusable even with no name to fall back on")
+    func unusableServerWithoutName() {
+        let defaults = makeDefaults()
+        #expect(Settings.apply(PairingLink(server: "ftp://nope", passcode: "x"), to: defaults) == .unusable)
     }
 }
 

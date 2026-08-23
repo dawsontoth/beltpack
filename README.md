@@ -130,8 +130,14 @@ The control panel has the same thing behind its **Pair** button, and any phone
 already on comms can pair another from **Settings → Pair another phone**. That
 last one is usually the easiest: hold your phone out to whoever just arrived.
 
-The scanned phone still needs its own position name — "Camera 2", "FOH" — since
-that is what everyone else sees.
+A code cannot carry a position name, because whoever holds it out has no idea
+who is about to scan it. So the app asks for one right after the scan — a list
+of the usual positions to tap, or type anything — and joins. That is the whole
+of what a volunteer does: scan, tap "Camera 2", they are on comms.
+
+Names are what everyone else sees when a cue goes out, so they want to be
+positions rather than people. Two phones claiming the same name is worth
+avoiding — the roster in the control panel is where you would spot it.
 
 > The passcode travels inside the code. A printed one is a key: anyone who
 > photographs it is on comms.
