@@ -6,44 +6,63 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 28) {
-                Spacer()
-                StatusDial(state: comms.state, isTalking: comms.isTalking)
-                statusText
-                if isConnected {
-                    LevelControls()
-                        .environmentObject(comms)
-                }
+            // Scrolls rather than compresses. With everything on screen at
+            // once — status, two level rows, the talk button, presets and a
+            // text field — a fixed stack runs off the bottom of a smaller
+            // phone, and the join button is the part that disappears.
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 22) {
+                        statusText
 
-                if isConnected, Settings.talkMode.needsMicrophone, Settings.talkMode != .open {
-                    TalkButton(
-                        mode: Settings.talkMode,
-                        isTalking: comms.isTalking,
-                        onPress: { Task { await comms.startTalking() } },
-                        onRelease: { Task { await comms.stopTalking() } },
-                        onToggle: { Task { await comms.toggleTalking() } },
-                    )
-                }
-                if comms.micDenied {
-                    Text("Microphone access is off for Beltpack. Enable it in Settings.")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                } else if let reason = comms.micUnavailable {
-                    Text("Listening only — \(reason)")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                        .multilineTextAlignment(.center)
-                }
-                if isConnected {
-                    AnnouncementBar()
-                        .environmentObject(comms)
-                }
+                        if isConnected {
+                            LevelControls()
+                                .environmentObject(comms)
+                        }
 
-                Spacer()
-                connectButton
+                        if isConnected, Settings.talkMode.needsMicrophone, Settings.talkMode != .open {
+                            TalkButton(
+                                mode: Settings.talkMode,
+                                isTalking: comms.isTalking,
+                                onPress: { Task { await comms.startTalking() } },
+                                onRelease: { Task { await comms.stopTalking() } },
+                                onToggle: { Task { await comms.toggleTalking() } },
+                            )
+                        }
+
+                        if comms.micDenied {
+                            Text("Microphone access is off for Beltpack. Enable it in Settings.")
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .multilineTextAlignment(.center)
+                        } else if let reason = comms.micUnavailable {
+                            Text("Listening only — \(reason)")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 20)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+
+                // Pinned: the things somebody reaches for in a hurry should
+                // never be the things that scrolled away.
+                VStack(spacing: 14) {
+                    if isConnected {
+                        AnnouncementBar()
+                            .environmentObject(comms)
+                    }
+                    connectButton
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+                .background(.bar)
             }
-            .padding(28)
             .animation(.easeOut(duration: 0.2), value: comms.announcement)
             .navigationTitle("Beltpack")
             .toolbar {
@@ -72,24 +91,39 @@ struct ContentView: View {
     private var statusText: some View {
         switch comms.state {
         case .idle:
-            Text("Not connected").foregroundStyle(.secondary)
+            Label("Not connected", systemImage: "headphones.slash")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
         case .connecting:
-            Text("Connecting…").foregroundStyle(.secondary)
+            Label("Connecting…", systemImage: "arrow.triangle.2.circlepath")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
         case .listening:
             VStack(spacing: 6) {
-                Text(comms.isTalking ? "Talking" : "On comms")
-                    .font(.headline)
-                    .foregroundStyle(comms.isTalking ? .orange : .primary)
+                Label(
+                    comms.isTalking ? "Talking" : "On comms",
+                    systemImage: comms.isTalking ? "mic.fill" : "headphones",
+                )
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(comms.isTalking ? Color.orange : Color.green)
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
         case .reconnecting:
-            Text("Reconnecting…").foregroundStyle(.orange)
+            Label("Reconnecting…", systemImage: "arrow.triangle.2.circlepath")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.orange)
         case let .failed(message):
-            Text(message)
-                .foregroundStyle(.red)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 6) {
+                Label("Not connected", systemImage: "exclamationmark.triangle.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.red)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -129,43 +163,6 @@ struct ContentView: View {
         return false
     }
 }
-
-/// A big, glanceable state indicator — this gets read in a dark booth,
-/// often at arm's length.
-private struct StatusDial: View {
-    let state: CommsClient.State
-    var isTalking = false
-
-    var body: some View {
-        Circle()
-            .fill(color.opacity(0.16))
-            .overlay(Circle().strokeBorder(color, lineWidth: 3))
-            .overlay(Image(systemName: symbol).font(.system(size: 64)).foregroundStyle(color))
-            .frame(width: 180, height: 180)
-            .animation(.easeInOut(duration: 0.2), value: color)
-    }
-
-    private var color: Color {
-        if isTalking { return .orange }
-        switch state {
-        case .idle: return .secondary
-        case .connecting, .reconnecting: return .orange
-        case .listening: return .green
-        case .failed: return .red
-        }
-    }
-
-    private var symbol: String {
-        if isTalking { return "mic.fill" }
-        switch state {
-        case .idle: return "headphones"
-        case .connecting, .reconnecting: return "arrow.triangle.2.circlepath"
-        case .listening: return "headphones.circle.fill"
-        case .failed: return "exclamationmark.triangle.fill"
-        }
-    }
-}
-
 /// The talk control. Big, because it gets pressed by someone whose eyes are
 /// on a camera rather than the phone, and haptic for the same reason.
 private struct TalkButton: View {
