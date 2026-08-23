@@ -24,6 +24,9 @@ final class CommsClient: ObservableObject {
     @Published private(set) var consoleIsLive = false
     @Published private(set) var isTalking = false
     @Published private(set) var micDenied = false
+    /// Why the microphone is unusable, when it is. Distinct from `state`:
+    /// being unable to talk is not being disconnected.
+    @Published private(set) var micUnavailable: String?
 
     /// Pushed to the watch on every change, so the wrist reflects what the
     /// phone is actually doing rather than what a button was pressed to do.
@@ -63,6 +66,14 @@ final class CommsClient: ObservableObject {
     var levels: AudioLevels { Self.sharedLevels }
     private lazy var micProcessor = GainProcessor(path: .capture, store: Self.sharedLevels.store, gain: Float(Settings.micGain))
     private lazy var listenProcessor = GainProcessor(path: .render, store: Self.sharedLevels.store, gain: 1)
+    private let speech = SpeechInjector()
+
+    /// The most recent announcement from anyone, including your own, so every
+    /// phone shows the same thing.
+    @Published private(set) var announcement: Announcement?
+    @Published private(set) var isAnnouncing = false
+    private var announcementTask: Task<Void, Never>?
+    private var bannerTask: Task<Void, Never>?
 
     private var micTrack: LocalAudioTrack?
     private var micPublication: LocalTrackPublication?
@@ -84,6 +95,7 @@ final class CommsClient: ObservableObject {
             .sink { [weak self] in self?.syncWatch() }
         // Metering on the render path, gain on the capture path. Listening
         // level is set per remote track instead, which is the supported API.
+        micProcessor.speech = speech
         AudioManager.shared.capturePostProcessingDelegate = micProcessor
         AudioManager.shared.renderPreProcessingDelegate = listenProcessor
     }
@@ -221,6 +233,97 @@ final class CommsClient: ObservableObject {
         }
     }
 
+    // MARK: - Announcements
+
+    /// Speaks `text` over comms and shows it on everyone's phone.
+    ///
+    /// Two paths on purpose: somebody in listen-only, or with a phone in a
+    /// pocket, still needs to see that a cue went out even though they will
+    /// not hear it as speech.
+    func announce(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, case .listening = state else { return }
+
+        let item = Announcement(text: trimmed, sender: Settings.identity)
+        show(item)
+        broadcast(item)
+
+        // An announcement needs the microphone even in listen-only, since that
+        // is the track it rides out on.
+        if micTrack == nil { await armMicrophone() }
+        guard let track = micTrack else {
+            // The text already went out; only the speech is lost. Saying so is
+            // better than looking like the button did nothing.
+            micUnavailable = micUnavailable ?? "Microphone unavailable — text sent without speech."
+            return
+        }
+
+        announcementTask?.cancel()
+        isAnnouncing = true
+
+        await speech.speak(trimmed)
+        try? await track.unmute()
+
+        announcementTask = Task { [weak self] in
+            guard let self else { return }
+            // Poll rather than await a completion callback: the buffer is
+            // drained on a realtime thread, and the only honest signal that an
+            // announcement finished is that thread running out of samples.
+            while await self.speech.isSpeaking, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(80))
+            }
+            await self.finishAnnouncing()
+        }
+    }
+
+    /// Shows an announcement and clears it after a while. A cue from ten
+    /// minutes ago sitting on screen is worse than none: it stops being
+    /// information and starts being furniture.
+    private func show(_ item: Announcement) {
+        announcement = item
+        bannerTask?.cancel()
+        bannerTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            guard !Task.isCancelled else { return }
+            await MainActor.run { self?.announcement = nil }
+        }
+    }
+
+    func stopAnnouncement() async {
+        announcementTask?.cancel()
+        speech.stop()
+        await finishAnnouncing()
+    }
+
+    private func finishAnnouncing() async {
+        isAnnouncing = false
+        announcementTask = nil
+        // Hand the microphone back to whatever mode was in force. Leaving it
+        // open after an announcement is how a room ends up hearing somebody's
+        // car radio.
+        if Settings.talkMode != .open, !isTalking {
+            try? await micTrack?.mute()
+        }
+    }
+
+    private func broadcast(_ item: Announcement) {
+        guard let data = item.encoded() else { return }
+        Task {
+            do {
+                try await room.localParticipant.publish(
+                    data: data,
+                    options: DataPublishOptions(topic: Announcement.topic, reliable: true),
+                )
+                log.notice("announcement sent on \(Announcement.topic, privacy: .public)")
+            } catch {
+                // Swallowing this would leave the sender believing everyone saw
+                // a cue that never left the phone.
+                log.error("announcement failed to send: \(error.localizedDescription, privacy: .public)")
+                micUnavailable = "Announcement could not be sent."
+            }
+        }
+    }
+
     // MARK: - Talking
 
     /// Publishes the microphone already muted, so pressing talk is a local
@@ -233,6 +336,7 @@ final class CommsClient: ObservableObject {
             return
         }
         micDenied = false
+        micUnavailable = nil
 
         do {
             try configureAudioSession(forTalking: true)
@@ -256,7 +360,13 @@ final class CommsClient: ObservableObject {
             // The expensive part, paid once at connect rather than per press.
             log.notice("microphone armed in \(Int(Date().timeIntervalSince(armStart) * 1000))ms")
         } catch {
-            state = .failed(error.localizedDescription)
+            // Not being able to talk is not the same as not being on comms.
+            // Failing the whole connection here would tell somebody with a
+            // busy or broken microphone that comms is down, when they can in
+            // fact hear everything.
+            micUnavailable = error.localizedDescription
+            micPublication = nil
+            micTrack = nil
             try? configureAudioSession(forTalking: false)
         }
     }

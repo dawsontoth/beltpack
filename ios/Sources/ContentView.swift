@@ -29,11 +29,22 @@ struct ContentView: View {
                         .font(.footnote)
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
+                } else if let reason = comms.micUnavailable {
+                    Text("Listening only — \(reason)")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.center)
                 }
+                if isConnected {
+                    AnnouncementBar()
+                        .environmentObject(comms)
+                }
+
                 Spacer()
                 connectButton
             }
             .padding(28)
+            .animation(.easeOut(duration: 0.2), value: comms.announcement)
             .navigationTitle("Beltpack")
             .toolbar {
                 Button { showingSettings = true } label: {
@@ -43,6 +54,16 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+        }
+        // On the NavigationStack, not its content: applied inside, the inset
+        // lands above the navigation bar and rides over the status bar.
+        .safeAreaInset(edge: .top) {
+            if let announcement = comms.announcement {
+                AnnouncementBanner(announcement: announcement)
+                    .id(announcement.id)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
             }
         }
     }

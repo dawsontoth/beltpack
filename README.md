@@ -231,6 +231,31 @@ carries it across. Its bundle identifier has to be the phone's with
 `org.beltpack.BeltpackWatch`, which looks reasonable and stops the phone app
 installing at all.
 
+## Spoken announcements
+
+Preset buttons speak a short cue over comms and show its text on every phone in
+the room. Free text is there underneath for anything the presets do not cover.
+
+Two paths for one event, deliberately. The speech rides the sender's existing
+microphone track; the text goes over the room's data channel. Somebody in
+listen-only, or with one earbud in a loud room, still needs to see that a cue
+went out even though they will not hear it.
+
+Getting speech onto the wire took a detour worth knowing about: WebRTC captures
+from the device microphone, not from an arbitrary buffer, so there is no
+"publish this audio" call. What there is, is the capture post-processing hook —
+the same one the gain trim uses. An announcement is rendered to buffers up
+front, then written over the microphone's samples while it plays. It takes the
+buffer over rather than mixing into it, because mixing would put room noise and
+whoever is nearby underneath a cue meant to be unambiguous.
+
+Announcements need `canPublishData` on the join token. Without it the SFU drops
+the message while the sending client reports success — the feature fails
+invisibly, which is how it failed here first.
+
+Banners clear themselves after twenty seconds. A cue from ten minutes ago stops
+being information and becomes furniture.
+
 ## Personal levels
 
 Each beltpack carries its own trims, because one position always wants the

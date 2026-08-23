@@ -31,6 +31,14 @@ struct BeltpackApp: App {
                     if CommandLine.arguments.contains("-beltpack-autoconnect") {
                         await comms.connect()
                     }
+                    // Fires an announcement without a human tap, so the
+                    // send path can be exercised in a simulator.
+                    if let index = CommandLine.arguments.firstIndex(of: "-beltpack-announce"),
+                       index + 1 < CommandLine.arguments.count
+                    {
+                        try? await Task.sleep(for: .seconds(3))
+                        await comms.announce(CommandLine.arguments[index + 1])
+                    }
                     #endif
                 }
         }

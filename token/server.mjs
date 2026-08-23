@@ -54,7 +54,10 @@ function mint(identity) {
       roomJoin: true,
       canPublish: BELTPACK_CAN_PUBLISH === "true",
       canSubscribe: true,
-      canPublishData: false,
+      // Required for announcements: the text of a spoken cue travels on the
+      // data channel. Without it the SFU silently drops the message while the
+      // sending client reports success, so the feature fails invisibly.
+      canPublishData: true,
     },
   };
 

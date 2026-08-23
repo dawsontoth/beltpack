@@ -170,3 +170,21 @@ select {
 }
 
 #resolved[data-bad="true"] { color: var(--failed); }
+
+/* ---- announcement banner ---- */
+
+#banner[hidden] { display: none; }
+
+#banner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f2c14e;
+  color: #14181f;
+}
+
+#banner-text { margin: 0; font-weight: 600; font-size: 1.05rem; }
+#banner-from { margin: 0; font-size: 0.75rem; opacity: 0.7; }

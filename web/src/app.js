@@ -9,6 +9,7 @@ import { Room, RoomEvent } from "livekit-client";
 import { normalize } from "./server-address.js";
 
 const SETTINGS_KEY = "beltpack.settings";
+const ANNOUNCEMENT_TOPIC = "beltpack.announcement";
 
 const els = {
   dial: document.querySelector("#dial"),
@@ -24,6 +25,9 @@ const els = {
   resolved: document.querySelector("#resolved"),
   identity: document.querySelector("#identity"),
   passcode: document.querySelector("#passcode"),
+  banner: document.querySelector("#banner"),
+  bannerText: document.querySelector("#banner-text"),
+  bannerFrom: document.querySelector("#banner-from"),
 };
 
 const room = new Room({ adaptiveStream: false, dynacast: false });
@@ -36,6 +40,7 @@ let shouldBeConnected = false;
 let reconnectTimer = null;
 let reconnectDelay = 1000;
 let micError = null;
+let bannerTimer = null;
 
 const NEEDS_MIC = (mode) => mode !== "listenOnly";
 
@@ -260,6 +265,27 @@ async function stopTalking() {
     setState(connected ? "listening" : "idle", connected ? "On comms" : "Not connected");
   }
 }
+
+/** Announcements arrive as text on the data channel and as speech on the
+ *  sender's audio track. The text matters on its own: somebody listening on one
+ *  earbud in a loud room may not catch the speech, and somebody in listen-only
+ *  still needs to see the cue went out. */
+room.on(RoomEvent.DataReceived, (payload, _participant, _kind, topic) => {
+  if (topic !== ANNOUNCEMENT_TOPIC) return;
+  try {
+    const item = JSON.parse(new TextDecoder().decode(payload));
+    if (!item?.text) return;
+    els.bannerText.textContent = item.text;
+    els.bannerFrom.textContent = item.sender || "Announcement";
+    els.banner.hidden = false;
+    // Clear it after a while: a cue from ten minutes ago stops being
+    // information and becomes furniture.
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => { els.banner.hidden = true; }, 20000);
+  } catch {
+    // A malformed announcement is not worth taking the client down for.
+  }
+});
 
 room.on(RoomEvent.Reconnecting, () => setState("connecting", "Reconnecting…"));
 room.on(RoomEvent.Reconnected, () => setState("listening", "On comms"));
