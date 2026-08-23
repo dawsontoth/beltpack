@@ -1,7 +1,17 @@
 // Cache the shell so the app opens instantly and survives a flaky moment on
 // the way to the booth. Tokens and media are never cached.
-const CACHE = "beltpack-v1";
-const SHELL = ["./", "./index.html", "./styles.css", "./dist/app.js", "./manifest.webmanifest", "./icon.svg"];
+const CACHE = "beltpack-v2";
+const SHELL = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./dist/app.js",
+  "./manifest.webmanifest",
+  "./icon.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));

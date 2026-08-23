@@ -74,6 +74,19 @@ echo cancellation, noise suppression and AGC **on**; the console feed has all
 three **off**. One is a voice in a loud room, the other is a finished mix, and
 the processing that rescues the first wrecks the second.
 
+## Icons
+
+Every icon comes from one source, `appicon-raw.png`:
+
+```bash
+make icons
+```
+
+The generated sets are committed because they are build inputs, but they are
+never edited by hand — change the source and regenerate. The script refuses a
+source with an alpha channel, because iOS accepts one at build time and rejects
+it at upload time, which is a bad place to find out.
+
 ## Layout
 
 | Path | What it is |

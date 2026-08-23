@@ -38,6 +38,10 @@ ios/Local.xcconfig:
 	cp ios/Local.xcconfig.example $@
 	@echo "created ios/Local.xcconfig - set DEVELOPMENT_TEAM in it to build for a device"
 
+.PHONY: icons
+icons: ## Regenerate every app icon from appicon-raw.png
+	./scripts/make-icons.sh
+
 .PHONY: ios
 ios: ios/Local.xcconfig ## Regenerate and open the iOS Xcode project
 	cd ios && xcodegen generate && open Beltpack.xcodeproj
