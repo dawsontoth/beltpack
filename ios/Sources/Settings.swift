@@ -50,6 +50,25 @@ enum Settings {
     /// is everyone's problem rather than only your own.
     static let gainRange: ClosedRange<Double> = 0 ... 2
 
+    /// The same range in decibels, which is what the sliders actually work in.
+    ///
+    /// Snapping the multiplier to whole numbers would offer 0, 1 and 2 and
+    /// nothing else. Whole decibels give thirty usable positions and put unity
+    /// exactly on one of them, which is the value people reach for.
+    /// +6 dB is 1.995, a fifth of a percent under the cap above and 0.02 dB
+    /// short of it — near enough that the slider reaches the top in practice,
+    /// while the cap stays the one real limit.
+    static let decibelRange: ClosedRange<Double> = -24 ... 6
+
+    static func decibels(fromGain gain: Double) -> Double {
+        guard gain > 0 else { return decibelRange.lowerBound }
+        return (20 * log10(gain)).clamped(to: decibelRange)
+    }
+
+    static func gain(fromDecibels decibels: Double) -> Double {
+        pow(10, decibels.clamped(to: decibelRange) / 20).clamped(to: gainRange)
+    }
+
     static var listenVolume: Double {
         get { number(Key.listenVolume) }
         set { UserDefaults.standard.set(newValue, forKey: Key.listenVolume) }

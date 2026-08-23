@@ -267,21 +267,50 @@ private struct LevelRow: View {
     let onChange: (Double) -> Void
     var dimmed = false
 
+    private var decibels: Double { Settings.decibels(fromGain: value).rounded() }
+
+    private var readout: String {
+        if decibels == 0 { return "unity" }
+        if decibels <= Settings.decibelRange.lowerBound { return "off" }
+        return String(format: "%+.0f dB", decibels)
+    }
+
+    /// Drives the slider in decibels while the stored value stays linear, so
+    /// nothing has to be migrated and the audio path is unchanged.
+    private var decibelBinding: Binding<Double> {
+        Binding(
+            get: { decibels },
+            set: { newValue in
+                let updated = newValue <= Settings.decibelRange.lowerBound
+                    ? 0
+                    : Settings.gain(fromDecibels: newValue)
+                guard updated != value else { return }
+                value = updated
+                // A detent you can feel: hitting unity without looking is the
+                // whole point of snapping.
+                UIImpactFeedbackGenerator(style: newValue == 0 ? .rigid : .light).impactOccurred()
+                onChange(updated)
+            },
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: systemImage).font(.caption)
                 Text(title).font(.caption)
                 Spacer()
-                Text(value == 1 ? "unity" : String(format: "%+.0f dB", 20 * log10(max(value, 0.01))))
+                Text(readout)
                     .font(.caption.monospacedDigit())
+                    .foregroundStyle(decibels == 0 ? Color.primary : Color.secondary)
             }
             .foregroundStyle(.secondary)
 
-            Slider(value: $value, in: Settings.gainRange) { editing in
+            // Whole decibels, so unity is a position you can land on rather
+            // than one you have to hunt for.
+            Slider(value: decibelBinding, in: Settings.decibelRange, step: 1) { editing in
                 if !editing { onChange(value) }
             }
-            .onChange(of: value) { _, new in onChange(new) }
 
             Meter(level: level).opacity(dimmed ? 0.35 : 1)
         }

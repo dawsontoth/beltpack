@@ -71,3 +71,43 @@ struct PairingTests {
         #expect(Settings.apply(PairingLink(server: "ftp://nope", passcode: "x", identity: "Op"), to: defaults) == false)
     }
 }
+
+/// The gain sliders work in whole decibels while the stored value stays linear.
+@Suite("Gain")
+struct GainTests {
+    @Test("unity is exactly 0 dB, and round-trips")
+    func unity() {
+        #expect(Settings.decibels(fromGain: 1) == 0)
+        #expect(Settings.gain(fromDecibels: 0) == 1)
+    }
+
+    @Test("the top of the decibel range reaches the cap without exceeding it")
+    func topOfRange() {
+        let top = Settings.gain(fromDecibels: Settings.decibelRange.upperBound)
+        // +6 dB is 1.995 rather than exactly 2. What matters is that the
+        // slider gets within a whisker of the cap and never past it — a
+        // multiplier above the cap would be a limit that does not hold.
+        #expect(top <= Settings.gainRange.upperBound)
+        #expect(top > Settings.gainRange.upperBound - 0.01)
+    }
+
+    @Test("whole decibels round-trip without drifting")
+    func roundTrip() {
+        for decibels in stride(from: -24.0, through: 6.0, by: 1) {
+            let gain = Settings.gain(fromDecibels: decibels)
+            #expect(abs(Settings.decibels(fromGain: gain) - decibels) < 0.001)
+        }
+    }
+
+    @Test("silence reads as the bottom of the range rather than negative infinity")
+    func silence() {
+        #expect(Settings.decibels(fromGain: 0) == Settings.decibelRange.lowerBound)
+    }
+
+    @Test("values outside the range are clamped rather than accepted")
+    func clamping() {
+        #expect(Settings.gain(fromDecibels: 60) <= Settings.gainRange.upperBound)
+        #expect(Settings.gain(fromDecibels: -200) >= Settings.gainRange.lowerBound)
+        #expect(Settings.decibels(fromGain: 100) == Settings.decibelRange.upperBound)
+    }
+}

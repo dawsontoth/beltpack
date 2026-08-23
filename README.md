@@ -205,6 +205,10 @@ somebody joining. **They hear you** runs in the capture post-processing hook,
 after echo cancellation and noise suppression, so turning yourself up does not
 turn up what those were removing. Both cap at +6 dB.
 
+The sliders move in whole decibels, so unity is a position you land on rather
+than hunt for, with a haptic detent on each step and a firmer one at unity. The
+stored value stays a linear multiplier; only the control works in decibels.
+
 Meters are RMS on a dBFS scale — green to about −12, amber to −3, red above. A
 linear peak meter reads nearly full on ordinary speech and tells you nothing.
 
