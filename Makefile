@@ -113,7 +113,12 @@ check: ios/Local.xcconfig ## Build everything and lint what can be linted
 	cd server && swift build
 	cd server && swift test
 	cd ios && xcodegen generate
+	cd ios && xcodebuild -project Beltpack.xcodeproj -scheme Beltpack \
+		-destination 'generic/platform=iOS Simulator' \
+		-configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -1
 	cd mac && xcodegen generate
+	cd mac && xcodebuild -project BeltpackHost.xcodeproj -scheme BeltpackHost \
+		-configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -1
 	cd web && npm install && npm run build && npm test
 	node --check token/server.mjs
 	bash -n deploy/run.sh

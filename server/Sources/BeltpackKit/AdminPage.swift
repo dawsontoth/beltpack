@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import Foundation
 
 /// The management page, embedded rather than shipped as a file so the host is
@@ -259,3 +261,5 @@ enum AdminPage {
     </html>
     """#
 }
+
+#endif

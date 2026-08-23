@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import Foundation
 import OSLog
 
@@ -188,3 +190,5 @@ public final class ControlServer: @unchecked Sendable {
         ))
     }
 }
+
+#endif
