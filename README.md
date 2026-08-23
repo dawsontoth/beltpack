@@ -244,6 +244,23 @@ Creating that profile the first time needs your Apple ID, which `xcodebuild`
 cannot do on its own: open `ios/Beltpack.xcodeproj`, select the BeltpackWatch
 target, and let Signing & Capabilities register the App ID.
 
+### Keeping it on the wrist
+
+The app declares Always On support, so lowering your wrist dims it in place
+instead of returning to the clock. Raise your wrist and the talk button is
+already there, still being updated by the phone — rather than two taps away at
+the moment you need it.
+
+Two watch settings matter alongside that, and an app cannot set either:
+
+* **Settings → General → Return to Clock → Beltpack → Return to App**, so a
+  longer absence still comes back to the button.
+* **Settings → Display & Brightness → Wake Duration → 70 seconds**, worth it
+  for someone who glances rather than stares.
+
+The watch is never the audio path, so it does not need to run in the
+background — only to be in front when a wrist comes up.
+
 ## Reconnection
 
 LiveKit handles short outages itself. Past the point where it gives up — a

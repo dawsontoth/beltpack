@@ -112,6 +112,12 @@ targets:
         CFBundleVersion: "1"
         WKApplication: true
         WKCompanionAppBundleIdentifier: org.beltpack.Beltpack
+        # Without this the watch returns to the clock a few seconds after the
+        # wrist drops, and the talk button is two interactions away at the
+        # moment it is wanted. With it the app stays frontmost and dimmed, so
+        # raising the wrist shows the button already there — and it keeps
+        # receiving state from the phone instead of being torn down.
+        WKSupportsAlwaysOnDisplay: true
     settings:
       base:
         # Must be the phone's identifier with .watchkitapp appended, or the

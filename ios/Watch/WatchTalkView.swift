@@ -9,6 +9,10 @@ import WatchKit
 struct WatchTalkView: View {
     @EnvironmentObject private var link: WatchLink
     @State private var pressed = false
+    /// True when the wrist is down and the display is dimmed. The app is still
+    /// frontmost and still being updated — it just must not sit there at full
+    /// brightness for an hour.
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     private var snapshot: CommsSnapshot { link.snapshot }
 
@@ -32,7 +36,9 @@ struct WatchTalkView: View {
                     .padding(.horizontal, 6)
             }
             .scaleEffect(pressed ? 0.94 : 1)
-            .animation(.easeOut(duration: 0.1), value: pressed)
+            // Animating a dimmed screen is spend for something nobody is
+            // looking at.
+            .animation(isLuminanceReduced ? nil : .easeOut(duration: 0.1), value: pressed)
         }
         .contentShape(Rectangle())
         .gesture(gesture)
@@ -66,13 +72,16 @@ struct WatchTalkView: View {
     // MARK: - Appearance
 
     private var background: Color {
-        if snapshot.isTalking { return .orange }
+        // A live mic still has to be obvious with the wrist down — that is the
+        // state most worth noticing — but not at full brightness.
+        if snapshot.isTalking { return isLuminanceReduced ? Color.orange.opacity(0.4) : .orange }
         if !link.isReachable || !snapshot.isConnected { return .black }
-        return Color(white: 0.11)
+        return Color(white: isLuminanceReduced ? 0.06 : 0.11)
     }
 
     private var foreground: Color {
-        snapshot.isTalking ? .black : .white
+        // Black on dimmed orange is unreadable; the dark background takes white.
+        snapshot.isTalking && !isLuminanceReduced ? .black : .white
     }
 
     private var symbol: String {
