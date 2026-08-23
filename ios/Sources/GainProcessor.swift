@@ -19,20 +19,24 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
     /// replace the microphone's entirely.
     var speech: SpeechInjector?
 
-    /// WebRTC's processing buffers are float, but carry int16-range values on
-    /// most paths rather than ±1. That is the documented convention, so it is
-    /// the default rather than something to be discovered — synthesised speech
-    /// written in at ±1 into an int16-range buffer comes out 90 dB down, which
-    /// is silence with extra steps.
+    /// What full scale means in these buffers, used both for metering and for
+    /// writing speech in at the right level. WebRTC's processing buffers are
+    /// float but carry int16-range values — ±32768, not ±1.
     ///
-    /// It is still checked against the signal, because not every path agrees:
-    /// a buffer carrying real audio that never exceeds ±1 is float-scaled.
-    private var usesInt16Scale = true
-    private var scaleObserved = false
-
-    /// What full scale means in this buffer, used both for metering and for
-    /// writing speech in at the right level.
-    private var fullScale: Float { usesInt16Scale ? 32768 : 1 }
+    /// This used to be inferred from the signal, and inferring it is what
+    /// produced a meter that wandered with every microphone muted. Silence is
+    /// not silent: it is a least-significant-bit of dither. A buffer whose peak
+    /// is 1 is indistinguishable by peak alone from full-scale float audio, so
+    /// the guess concluded "float", divided by 1 instead of 32768, and painted
+    /// the noise floor 90 dB too high. It latched, so it stayed wrong for the
+    /// rest of the session and tracked nothing.
+    ///
+    /// No float-scaled path was ever actually observed. Every symptom that
+    /// motivated the guess — speech written at ±1 coming out inaudible, a meter
+    /// pegged red — was an int16 buffer being read as float. So this is a
+    /// constant. If a float path does turn up, the meter reads low, which is
+    /// obvious and harmless, rather than reading high on nothing.
+    private static let fullScale: Float = 32768
 
     init(path: Path, store: LevelStore, gain: Float = 1) {
         self.path = path
@@ -56,7 +60,6 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
 
     func audioProcessingProcess(audioBuffer: LKAudioBuffer) {
         let gain = self.gain
-        var peak: Float = 0
         var sumOfSquares: Float = 0
         var counted = 0
 
@@ -70,13 +73,10 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
 
             if speaking, let speech {
                 let written = speech.drain(into: samples, frames: audioBuffer.frames)
-                // The synthesiser produces ±1; the buffer expects whatever
-                // this path uses. Without this the announcement is technically
-                // present and entirely inaudible.
-                let scale = fullScale
-                if scale != 1 {
-                    for index in 0 ..< written { samples[index] *= scale }
-                }
+                // The synthesiser produces ±1; the buffer expects int16
+                // range. Without this the announcement is technically present
+                // and entirely inaudible.
+                for index in 0 ..< written { samples[index] *= Self.fullScale }
                 // Silence whatever the microphone had in the rest of the
                 // buffer, so the tail of an announcement is not room tone.
                 for index in written ..< audioBuffer.frames { samples[index] = 0 }
@@ -85,21 +85,12 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
             for index in 0 ..< audioBuffer.frames {
                 let value = speaking ? samples[index] : samples[index] * gain
                 if !speaking { samples[index] = value }
-                let magnitude = abs(value)
-                peak = max(peak, magnitude)
                 sumOfSquares += value * value
             }
             counted += audioBuffer.frames
         }
 
-        // Decide once, and only on a buffer that actually carries signal:
-        // silence tells you nothing about scale, and announcements overwrite
-        // the buffer so they cannot be used to judge it either.
-        if !speaking, !scaleObserved, peak > 0.001 {
-            usesInt16Scale = peak > 1
-            scaleObserved = true
-        }
-        let rms = counted > 0 ? (sumOfSquares / Float(counted)).squareRoot() / fullScale : 0
+        let rms = counted > 0 ? (sumOfSquares / Float(counted)).squareRoot() / Self.fullScale : 0
 
         switch path {
         case .capture: store.reportMic(Self.meterLevel(rms))
@@ -112,7 +103,7 @@ final class GainProcessor: NSObject, AudioCustomProcessingDelegate, @unchecked S
     /// A linear peak meter reads nearly full on ordinary speech and tells you
     /// nothing; -60 dBFS to 0 is the range a person can actually judge a level
     /// against.
-    private static func meterLevel(_ rms: Float) -> Float {
+    static func meterLevel(_ rms: Float) -> Float {
         guard rms > 0.00001 else { return 0 }
         let decibels = 20 * log10(rms)
         return min(max((decibels + 60) / 60, 0), 1)
