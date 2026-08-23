@@ -33,6 +33,13 @@ final class CommsClient: ObservableObject {
     private var shouldBeConnected = false
     private var reconnectTask: Task<Void, Never>?
 
+    /// Shared so the meter views can observe it directly without the whole
+    /// screen redrawing twenty times a second.
+    static let sharedLevels = AudioLevels()
+    var levels: AudioLevels { Self.sharedLevels }
+    private lazy var micProcessor = GainProcessor(path: .capture, store: Self.sharedLevels.store, gain: Float(Settings.micGain))
+    private lazy var listenProcessor = GainProcessor(path: .render, store: Self.sharedLevels.store, gain: 1)
+
     private var micTrack: LocalAudioTrack?
     private var micPublication: LocalTrackPublication?
 
@@ -41,6 +48,32 @@ final class CommsClient: ObservableObject {
 
     init() {
         room.add(delegate: self)
+        // Metering on the render path, gain on the capture path. Listening
+        // level is set per remote track instead, which is the supported API.
+        AudioManager.shared.capturePostProcessingDelegate = micProcessor
+        AudioManager.shared.renderPreProcessingDelegate = listenProcessor
+    }
+
+    /// How loud you are to everyone else.
+    func setMicGain(_ value: Double) {
+        Settings.micGain = value
+        micProcessor.gain = Float(value)
+    }
+
+    /// How loud everyone else is to you. Applied to every subscribed track,
+    /// and to any that arrive later.
+    func setListenVolume(_ value: Double) {
+        Settings.listenVolume = value
+        applyListenVolume()
+    }
+
+    private func applyListenVolume() {
+        let volume = Settings.listenVolume
+        for participant in room.remoteParticipants.values {
+            for publication in participant.audioTracks {
+                (publication.track as? RemoteAudioTrack)?.volume = volume
+            }
+        }
     }
 
     func connect() async {
@@ -81,6 +114,7 @@ final class CommsClient: ObservableObject {
             // joins, so no participantDidConnect fires for it. Seed from
             // current state or the UI claims nothing is there.
             refreshTalkers(room)
+            applyListenVolume()
         } catch {
             if shouldBeConnected {
                 scheduleReconnect(reason: error.localizedDescription)
@@ -268,7 +302,12 @@ extension CommsClient: RoomDelegate {
     }
 
     nonisolated func room(_ room: Room, participant _: RemoteParticipant, didSubscribeTrack _: RemoteTrackPublication) {
-        Task { @MainActor in self.refreshTalkers(room) }
+        Task { @MainActor in
+            self.refreshTalkers(room)
+            // A track arriving later must not come in at unity when the
+            // operator has already turned things down.
+            self.applyListenVolume()
+        }
     }
 
     nonisolated func room(_ room: Room, participant _: RemoteParticipant, didUnsubscribeTrack _: RemoteTrackPublication) {

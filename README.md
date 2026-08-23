@@ -191,6 +191,25 @@ out is `.playAndRecord` with `.allowBluetoothA2DP` (not `.allowBluetooth`) plus
 `setPreferredInput()` forced to the built-in mic, so output stays in AAC and
 you talk into the phone you are already holding.
 
+## Personal levels
+
+Each beltpack carries its own trims, because one position always wants the
+director louder and one always sits too close to their own mic:
+
+* **You hear** — applied per remote track, and to any that arrive later, so
+  turning things down does not get undone by somebody joining.
+* **They hear you** — applied in WebRTC's capture *post*-processing hook, which
+  is deliberate: it runs after echo cancellation and noise suppression, so
+  turning yourself up does not also turn up what those were trying to remove.
+
+Both are capped at +6 dB rather than the SDK's +20. Past a modest boost you are
+amplifying room noise, and on comms that is everyone's problem rather than only
+your own.
+
+The meters read from the same audio hooks. The send meter dims while you are
+muted, since a meter that moves when nobody can hear you is worse than no meter
+at all.
+
 ## Reconnection
 
 All three clients retry a dropped connection with backoff, capped at 15s, and

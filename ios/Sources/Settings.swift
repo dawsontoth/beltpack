@@ -15,6 +15,8 @@ enum Settings {
         static let passcode = "beltpack.passcode"
         static let micMode = "beltpack.micMode"
         static let talkMode = "beltpack.talkMode"
+        static let listenVolume = "beltpack.listenVolume"
+        static let micGain = "beltpack.micGain"
     }
 
     static let defaultServerURL = "https://comms.example.org"
@@ -46,6 +48,27 @@ enum Settings {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: Key.talkMode) }
     }
 
+    /// Personal trims, unity at 1.0. Capped at 2 rather than the SDK's 10:
+    /// past a modest boost you are amplifying room noise, and on comms that
+    /// is everyone's problem rather than only your own.
+    static let gainRange: ClosedRange<Double> = 0 ... 2
+
+    static var listenVolume: Double {
+        get { number(Key.listenVolume) }
+        set { UserDefaults.standard.set(newValue, forKey: Key.listenVolume) }
+    }
+
+    static var micGain: Double {
+        get { number(Key.micGain) }
+        set { UserDefaults.standard.set(newValue, forKey: Key.micGain) }
+    }
+
+    private static func number(_ key: String) -> Double {
+        // An absent key reads as 0, which would silently mute somebody.
+        guard UserDefaults.standard.object(forKey: key) != nil else { return 1 }
+        return UserDefaults.standard.double(forKey: key).clamped(to: gainRange)
+    }
+
     static var isConfigured: Bool {
         !identity.isEmpty && !passcode.isEmpty && resolvedServerURL != nil
     }
@@ -53,5 +76,11 @@ enum Settings {
     /// What `serverURL` actually resolves to once tidied up.
     static var resolvedServerURL: URL? {
         ServerAddress.normalize(serverURL)
+    }
+}
+
+extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }

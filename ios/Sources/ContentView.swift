@@ -10,6 +10,11 @@ struct ContentView: View {
                 Spacer()
                 StatusDial(state: comms.state, isTalking: comms.isTalking)
                 statusText
+                if isConnected {
+                    LevelControls()
+                        .environmentObject(comms)
+                }
+
                 if isConnected, Settings.talkMode.needsMicrophone, Settings.talkMode != .open {
                     TalkButton(
                         mode: Settings.talkMode,
@@ -206,5 +211,99 @@ private struct TalkButton: View {
 
     private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
+    }
+}
+
+/// Personal trims. Every real beltpack has these, because one position always
+/// wants the director louder and one always sits too close to their own mic.
+private struct LevelControls: View {
+    @EnvironmentObject private var comms: CommsClient
+    @ObservedObject private var levels: AudioLevels
+
+    @State private var listen = Settings.listenVolume
+    @State private var mic = Settings.micGain
+
+    init() {
+        // Bound at init so the meters update without the parent redrawing.
+        _levels = ObservedObject(wrappedValue: CommsClient.sharedLevels)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            LevelRow(
+                title: "You hear",
+                systemImage: "speaker.wave.2.fill",
+                value: $listen,
+                level: levels.listen,
+                onChange: { comms.setListenVolume($0) },
+            )
+
+            LevelRow(
+                title: "They hear you",
+                systemImage: "mic.fill",
+                value: $mic,
+                level: comms.isTalking ? levels.mic : 0,
+                onChange: { comms.setMicGain($0) },
+                // A meter that moves while muted would suggest you are live.
+                dimmed: !comms.isTalking,
+            )
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct LevelRow: View {
+    let title: String
+    let systemImage: String
+    @Binding var value: Double
+    let level: Float
+    let onChange: (Double) -> Void
+    var dimmed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage).font(.caption)
+                Text(title).font(.caption)
+                Spacer()
+                Text(value == 1 ? "unity" : String(format: "%+.0f dB", 20 * log10(max(value, 0.01))))
+                    .font(.caption.monospacedDigit())
+            }
+            .foregroundStyle(.secondary)
+
+            Slider(value: $value, in: Settings.gainRange) { editing in
+                if !editing { onChange(value) }
+            }
+            .onChange(of: value) { _, new in onChange(new) }
+
+            Meter(level: level).opacity(dimmed ? 0.35 : 1)
+        }
+    }
+}
+
+/// A plain bar. Colour carries the warning, because in a dark booth at arm's
+/// length that reads faster than a number.
+private struct Meter: View {
+    let level: Float
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary)
+                Capsule()
+                    .fill(colour)
+                    .frame(width: geometry.size.width * CGFloat(min(max(level, 0), 1)))
+            }
+        }
+        .frame(height: 5)
+        .animation(.linear(duration: 0.05), value: level)
+    }
+
+    private var colour: Color {
+        switch level {
+        case ..<0.7: .green
+        case ..<0.92: .orange
+        default: .red
+        }
     }
 }
