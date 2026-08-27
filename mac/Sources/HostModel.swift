@@ -1,6 +1,7 @@
 import AppKit
 import BeltpackKit
 import Combine
+import OSLog
 import SwiftUI
 
 /// App-level state: where the configuration came from, and a little glue
@@ -12,6 +13,11 @@ final class HostModel: ObservableObject {
 
     let controller = BridgeController()
     private var control: ControlServer?
+    /// Every reason the control panel might not be up goes here as well as to
+    /// configError. configError is only visible behind the menu bar icon, and a
+    /// booth Mac is usually not being watched when it comes up — so a browser
+    /// that will not connect had no way to explain itself after the fact.
+    private let log = Logger(subsystem: "org.beltpack", category: "host")
 
     private var cancellables: Set<AnyCancellable> = []
     private static let envPathKey = "beltpack.envPath"
@@ -37,9 +43,13 @@ final class HostModel: ObservableObject {
     /// gate it with, so it stays off rather than opening unauthenticated
     /// control of the console to the whole VLAN.
     private func startControlServer() {
-        guard let config = controller.config else { return }
+        guard let config = controller.config else {
+            log.error("control panel not started: no config loaded from \(self.envPath, privacy: .public)")
+            return
+        }
         guard let passcode = config.adminPasscode, passcode.count >= 8 else {
             configError = "Set BELTPACK_ADMIN_PASSCODE (8+ characters) to enable the control panel."
+            log.error("control panel not started: BELTPACK_ADMIN_PASSCODE missing or under 8 characters")
             return
         }
 
@@ -47,8 +57,10 @@ final class HostModel: ObservableObject {
         do {
             try server.start()
             control = server
+            log.notice("control panel listening on 127.0.0.1:\(config.adminPort, privacy: .public)")
         } catch {
             configError = "Control panel could not start: \(error.localizedDescription)"
+            log.error("control panel failed to bind port \(config.adminPort, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 

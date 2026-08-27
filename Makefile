@@ -69,6 +69,13 @@ mac: ios/Local.xcconfig ## Build and launch the Mac host app
 mac-logs: ## Follow the Mac app's diagnostics
 	/usr/bin/log stream --predicate 'subsystem == "org.beltpack"' --style compact
 
+.PHONY: mac-logs-past
+mac-logs-past: ## Show past diagnostics, default the last hour (SINCE=30m to change)
+	@# `log stream` only shows what happens next, which is no use for working out
+	@# why something failed before you thought to look. The unified log kept it.
+	/usr/bin/log show --last $(or $(SINCE),1h) \
+		--predicate 'subsystem == "org.beltpack"' --style compact
+
 # ---- run locally ----------------------------------------------------------
 
 .PHONY: devices
