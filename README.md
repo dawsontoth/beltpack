@@ -141,6 +141,23 @@ Because it is a web page on the comms network, you can drive the booth Mac from
 a phone at the back of the room instead of from its keyboard — which is what
 makes pairing practical.
 
+**If nothing loads**, the host app is running but did not start the control
+server, and the reason is behind the Beltpack icon in the menu bar — it is a
+menu-bar app with no window, so that is the only place it can tell you. Click
+it. Usually it could not find `.env`, and the same menu lets you pick the file
+by hand.
+
+`make up` and `make mac` point the app at this checkout's `.env` for you, but
+only when it next launches. If it was already running, quit it from that menu
+first:
+
+```bash
+lsof -nP -iTCP:7884 -sTCP:LISTEN
+```
+
+That is the check that settles it — no output means nothing is listening, so
+the browser is right and the panel really is down.
+
 ## 6. Add a phone
 
 Never type an address or a passcode. Show a code instead:

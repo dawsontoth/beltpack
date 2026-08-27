@@ -42,6 +42,13 @@ for _ in $(seq 1 40); do
 done
 
 HOST_APP="$REPO/mac/build/Build/Products/Debug/BeltpackHost.app"
+# Tell the app which .env to read rather than leaving it to guess. Its guesses
+# only cover a checkout at ~/Code/beltpack, ~/beltpack or ~/Developer/beltpack;
+# anywhere else and it silently comes up with no config, no control panel, and
+# the reason tucked behind the menu bar icon. This script knows the answer, so
+# it should not be a guess. Read once at launch, hence before `open`.
+defaults write org.beltpack.BeltpackHost beltpack.envPath "$REPO/.env" 2>/dev/null || true
+
 if [[ -d "$HOST_APP" ]]; then
   if pgrep -f "BeltpackHost" >/dev/null; then
     echo "  host app already running"
@@ -56,7 +63,22 @@ fi
 echo
 echo "LiveKit:  $(curl -fsS --max-time 2 http://127.0.0.1:7880 2>/dev/null || echo 'not responding')"
 echo "Token:    $(curl -fsS --max-time 2 "http://127.0.0.1:${TOKEN_PORT:-7883}/healthz" 2>/dev/null || echo 'not responding')"
-echo "Control:  http://127.0.0.1:${BELTPACK_ADMIN_PORT:-7884}/"
+# Probed, not asserted. This line used to be printed unconditionally, so it
+# said the control panel was up whether or not anything was listening — which
+# is the one place a booth Mac most needs to be told the truth.
+ADMIN_PORT="${BELTPACK_ADMIN_PORT:-7884}"
+# curl's exit status, not the status code it prints: with no -f it exits 0 for
+# any HTTP reply — 401 from the passcode gate included, which means listening
+# and is not a fault — and non-zero only when nothing accepted the connection.
+# Reading the printed code invites `000` from curl and `000` from a fallback to
+# concatenate into something that matches neither.
+if curl -s -o /dev/null -m 2 "http://127.0.0.1:$ADMIN_PORT/" 2>/dev/null; then
+  echo "Control:  http://127.0.0.1:$ADMIN_PORT/"
+else
+  echo "Control:  not responding — click the Beltpack icon in the menu bar; it"
+  echo "          shows why, and lets you pick the .env by hand. If the app was"
+  echo "          already running, quit it from there and rerun make up."
+fi
 [[ -n "${BELTPACK_CLIENT_URL:-}" ]] && echo "Phones:   $BELTPACK_CLIENT_URL"
 echo
 echo "Logs: make logs      Stop: make down"

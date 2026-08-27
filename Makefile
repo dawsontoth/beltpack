@@ -60,6 +60,9 @@ mac: ios/Local.xcconfig ## Build and launch the Mac host app
 	cd mac && xcodegen generate
 	cd mac && xcodebuild -project BeltpackHost.xcodeproj -scheme BeltpackHost \
 		-configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+	@# So the app reads this checkout's .env instead of guessing at three fixed
+	@# paths and coming up with no control panel from anywhere else.
+	@defaults write org.beltpack.BeltpackHost beltpack.envPath "$(REPO)/.env" 2>/dev/null || true
 	open mac/build/Build/Products/Debug/BeltpackHost.app
 
 .PHONY: mac-logs
