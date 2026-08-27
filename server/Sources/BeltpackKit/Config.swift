@@ -35,6 +35,13 @@ public struct Config: Sendable {
     /// `subscribes` is true; route it to the WING channel feeding Bus 1.
     public let outputDeviceHint: String?
 
+    /// Which channel of a multichannel interface carries comms, 1-based to
+    /// match what the console prints. Nil means "whatever the device hands us
+    /// first", which is right for an ordinary two-channel interface and wrong
+    /// for a 48-channel console where the first channels are already in use.
+    public let inputChannel: Int?
+    public let outputChannel: Int?
+
     public static func fromEnvironment() throws -> Config {
         try from(ProcessInfo.processInfo.environment)
     }
@@ -58,6 +65,14 @@ public struct Config: Sendable {
             throw ConfigError.secretTooShort(secret.count)
         }
 
+        // A channel number is 1-based and must be a real one; 0 or a stray
+        // non-number means the same as not asking, rather than silently
+        // selecting something adjacent.
+        func channel(_ raw: String?) -> Int? {
+            guard let raw, let value = Int(raw.trimmingCharacters(in: .whitespaces)), value >= 1 else { return nil }
+            return value
+        }
+
         return Config(
             livekitURL: env["LIVEKIT_URL"] ?? "ws://127.0.0.1:7880",
             apiKey: try required("LIVEKIT_API_KEY"),
@@ -71,6 +86,8 @@ public struct Config: Sendable {
             adminPasscode: env["BELTPACK_ADMIN_PASSCODE"].flatMap { $0.isEmpty ? nil : $0 },
             adminPort: UInt16(env["BELTPACK_ADMIN_PORT"] ?? "") ?? 7884,
             outputDeviceHint: env["BELTPACK_OUTPUT_DEVICE"].flatMap { $0.isEmpty ? nil : $0 },
+            inputChannel: channel(env["BELTPACK_INPUT_CHANNEL"]),
+            outputChannel: channel(env["BELTPACK_OUTPUT_CHANNEL"]),
         )
     }
 }

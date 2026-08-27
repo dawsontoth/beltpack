@@ -94,11 +94,27 @@ public final class BridgeController: ObservableObject {
         try? AudioDevices.setDefault(device, direction: .output)
     }
 
+    /// Which channel of the selected device carries comms. Read before the
+    /// engine exists, so it has to happen ahead of connecting rather than when
+    /// a device is picked.
+    private func applyChannelMap() {
+        guard let config else { return }
+        let channels = ChannelSelection(
+            inputChannel: config.inputChannel,
+            outputChannel: config.outputChannel,
+        )
+        guard channels.isActive else { return }
+        // Chained ahead of the SDK's mixer rather than replacing it:
+        // set(engineObservers:) overwrites the whole list.
+        AudioManager.shared.set(engineObservers: [channels, AudioManager.shared.mixer])
+    }
+
     // MARK: - Running
 
     public func start() async {
         guard case .stopped = runState else { return }
         shouldRun = true
+        applyChannelMap()
         await connectAndPublish()
     }
 

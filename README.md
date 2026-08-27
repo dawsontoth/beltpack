@@ -197,10 +197,40 @@ values worth knowing.
 | `BELTPACK_ADMIN_PASSCODE` | Gates the control panel. Deliberately not the same. |
 | `BELTPACK_INPUT_DEVICE` | Substring of the Core Audio input name, e.g. `WING`. |
 | `BELTPACK_OUTPUT_DEVICE` | Where phone audio returns. Only used with `BELTPACK_SUBSCRIBE`. |
+| `BELTPACK_INPUT_CHANNEL` | Which channel of that device carries comms, 1-based. Blank for the first. |
+| `BELTPACK_OUTPUT_CHANNEL` | Which channel the phone return goes out on. Blank for the first. |
 | `BELTPACK_NODE_IP` | This Mac's LAN address. Phones send media straight here. |
 | `BELTPACK_CLIENT_URL` | What a phone is pointed at. Used to build pairing codes. |
 | `BELTPACK_CAN_PUBLISH` | Whether phones may talk. |
 | `BELTPACK_SUBSCRIBE` | Whether the bridge returns phone audio to the console. |
+
+## Channels on a console
+
+An ordinary interface has two channels and no question to answer. A WING has
+48 in and 48 out down one USB cable, and WebRTC has no notion of a channel at
+all — it captures "the default input device" and renders to "the default output
+device", which in practice means whichever channels come first. On a console
+those are usually already carrying something.
+
+`BELTPACK_INPUT_CHANNEL` and `BELTPACK_OUTPUT_CHANNEL` name the channel to use,
+numbered the way the console numbers them. Leave them blank and nothing
+changes.
+
+They work by putting a channel map on the audio units underneath LiveKit's
+audio engine, which is the supported way to say "channel 42 is the one I mean".
+The output map leaves every other channel silent rather than writing over it,
+so nothing else sharing that cable is disturbed.
+
+Whether it took is in the log, with the reason if it did not:
+
+```bash
+make mac-logs-past SINCE=10m
+```
+
+```
+capturing device input channel 42
+returning phone audio on device output channel 42 of 48
+```
 
 `BELTPACK_NODE_IP` is the one that bites. Phones connect their **media** straight
 to that address, bypassing everything else. Get it wrong and signalling connects

@@ -132,6 +132,19 @@ struct BeltpackBridge {
             log("returning phone audio to \(output.name) (\(output.channels) ch)")
         }
 
+        // Before anything builds an audio engine: a console puts 48 channels
+        // down one cable and WebRTC would otherwise take whichever comes
+        // first. Chained ahead of the SDK's own mixer rather than replacing
+        // it, since that is what set(engineObservers:) does to the list.
+        let channels = ChannelSelection(
+            inputChannel: config.inputChannel,
+            outputChannel: config.outputChannel,
+        )
+        if channels.isActive {
+            AudioManager.shared.set(engineObservers: [channels, AudioManager.shared.mixer])
+            log("channel map: input \(config.inputChannel.map(String.init) ?? "default"), output \(config.outputChannel.map(String.init) ?? "default")")
+        }
+
         // Deliberately not the Mac app's BridgeController: that type is
         // @MainActor, and creating a Room under main-actor isolation in a
         // process with no app run loop wedges a WebRTC signalling thread. The
