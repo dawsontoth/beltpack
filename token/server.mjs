@@ -22,7 +22,7 @@ const {
   // with no TLS needs 0.0.0.0 so a phone can reach it.
   TOKEN_BIND = "127.0.0.1",
   // Phase 2: flip to "true" to let beltpacks publish push-to-talk audio.
-  BELTPACK_CAN_PUBLISH = "false",
+  BELTPACK_CAN_PUBLISH = "true",
 } = process.env;
 
 for (const [key, value] of Object.entries({ LIVEKIT_API_KEY, LIVEKIT_API_SECRET, BELTPACK_PASSCODE })) {

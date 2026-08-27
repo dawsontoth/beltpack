@@ -379,6 +379,19 @@ final class CommsClient: ObservableObject {
         micDenied = false
         micUnavailable = nil
 
+        // The server decides whether a position may talk at all. Asking first
+        // turns "Unknown(Participant does not have permission to publish)" —
+        // which is what the failed publish reports, and is no use to a
+        // volunteer — into something that says what is actually true, and
+        // skips an attempt that was never going to succeed.
+        guard room.localParticipant.permissions.canPublish else {
+            micUnavailable = "talking is turned off for this server"
+            micPublication = nil
+            micTrack = nil
+            log.notice("mic not armed: the token grants no publish permission (BELTPACK_CAN_PUBLISH)")
+            return
+        }
+
         do {
             try configureAudioSession(forTalking: true)
 

@@ -103,6 +103,14 @@ PY
 while IFS=$'\t' read -r id name; do
     [ -n "$id" ] || continue
     echo "==> Installing on $name"
-    xcrun devicectl device install app --device "$id" "$APP" 2>&1 \
-        | grep -E "App installed|error|Error" || true
+    out=$(xcrun devicectl device install app --device "$id" "$APP" 2>&1) || true
+    if grep -q "DeviceLocked" <<< "$out"; then
+        # The real reason is five levels deep in a CoreDevice error chain that
+        # otherwise scrolls the actual instruction off the screen.
+        echo "    $name is locked — unlock it and run make phone again"
+    elif grep -q "App installed" <<< "$out"; then
+        echo "    installed"
+    else
+        grep -E "error|Error" <<< "$out" | head -3
+    fi
 done <<< "$ids"
