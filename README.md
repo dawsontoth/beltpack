@@ -371,17 +371,37 @@ to listen and silently unable to talk.
 ## Run it unattended
 
 ```bash
-make install-agents
-for s in livekit token host; do
-  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.beltpack.$s.plist
-done
+make autostart
 ```
+
+One command: it installs the three agents, loads them, and then checks that
+LiveKit, the token service and the control panel are actually answering rather
+than reporting success and leaving you to find out on a Sunday. `make
+autostart-status` asks the same questions later, and `make no-autostart` undoes
+it. Re-running is fine — an unchanged service is restarted in place.
+
+Run `make mac` first, or the host agent restart-loops until you do.
 
 These are **LaunchAgents, not LaunchDaemons**, and the host is an app bundle
 rather than a bare binary. Both for the same reason: a bundle has its own TCC
 identity, so the microphone prompt is attributed to Beltpack. A command-line
-binary has none, and its prompt lands on whatever terminal started it. The Mac
-needs auto-login for this to come back after a reboot.
+binary has none, and its prompt lands on whatever terminal started it.
+
+**An agent starts at login, not at boot.** Without automatic login a rebooted
+Mac sits at the login window with comms down, looking exactly like the agents
+were never installed — so `make autostart` checks and says so:
+
+* System Settings → Users & Groups → **Automatically log in as**
+* FileVault delays that until the disk is unlocked by hand, which the check
+  also points out.
+
+Two things bite here and neither shows up when starting from a terminal.
+launchd hands a process a minimal `PATH` with no Homebrew on it, so
+`livekit-server` is simply not found; `run.sh` puts it back. And a
+version-managed node — nvm, fnm, asdf — lives under the home directory and is
+put on `PATH` by a shell profile launchd never reads, so `make autostart`
+records the resolved path in `.env` as `BELTPACK_NODE_BIN`. Re-run it after
+changing node versions.
 
 Make the Mac behave like an appliance:
 
@@ -476,8 +496,11 @@ Verified end to end on real hardware: console to phone and back, push-to-talk,
 spoken announcements, announcement text across clients, pairing by deep link,
 personal levels, and reconnection at both layers.
 
-Not yet exercised: the WING itself over USB, the mix-minus routing that depends
-on it, TLS via Caddy, the LaunchAgents, and TestFlight distribution.
+The LaunchAgents are exercised too: installed, restarted, torn down and
+reinstalled, with all three services confirmed answering afterwards.
+
+Not yet exercised: the mix-minus routing on the console, TLS via Caddy, and
+TestFlight distribution.
 
 # What this is not
 

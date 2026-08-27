@@ -1,5 +1,4 @@
 REPO := $(shell pwd)
-AGENTS := $(HOME)/Library/LaunchAgents
 
 .DEFAULT_GOAL := help
 
@@ -108,25 +107,17 @@ run-bridge: server ## Run the WING bridge in the foreground
 
 # ---- deploy ---------------------------------------------------------------
 
-.PHONY: install-agents
-install-agents: ## Install LaunchAgents pointed at this checkout
-	@mkdir -p $(AGENTS) logs
-	@for svc in livekit token host; do \
-		sed 's|REPO|$(REPO)|g' deploy/launchd/org.beltpack.$$svc.plist \
-			> $(AGENTS)/org.beltpack.$$svc.plist; \
-		echo "installed $(AGENTS)/org.beltpack.$$svc.plist"; \
-	done
-	@echo
-	@echo "Now load them:"
-	@echo "  for s in livekit token host; do launchctl bootstrap gui/\$$(id -u) $(AGENTS)/org.beltpack.\$$s.plist; done"
+.PHONY: autostart
+autostart: ## Start beltpack automatically when this Mac comes up
+	./scripts/autostart.sh install
 
-.PHONY: uninstall-agents
-uninstall-agents: ## Unload and remove the LaunchAgents
-	@for svc in livekit token host; do \
-		launchctl bootout gui/$$(id -u)/org.beltpack.$$svc 2>/dev/null || true; \
-		rm -f $(AGENTS)/org.beltpack.$$svc.plist; \
-	done
-	@echo "removed"
+.PHONY: autostart-status
+autostart-status: ## Is autostart installed, and is everything answering?
+	./scripts/autostart.sh status
+
+.PHONY: no-autostart
+no-autostart: ## Stop starting automatically
+	./scripts/autostart.sh uninstall
 
 .PHONY: logs
 logs: ## Tail all service logs

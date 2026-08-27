@@ -19,6 +19,17 @@ set -a
 source "$REPO/.env"
 set +a
 
+# launchd hands a process a minimal PATH with no Homebrew on it, so a service
+# that runs perfectly from a terminal fails at boot with "livekit-server: not
+# found" and nothing else to go on. An interactive shell hides this, which is
+# why it survives every test that starts from one.
+for dir in /opt/homebrew/bin /usr/local/bin; do
+  if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
+    PATH="$dir:$PATH"
+  fi
+done
+export PATH
+
 mkdir -p "$REPO/logs"
 
 case "$SERVICE" in
@@ -37,7 +48,11 @@ case "$SERVICE" in
       --bind "${BELTPACK_BIND:-127.0.0.1}"
     ;;
   token)
-    exec node "$REPO/token/server.mjs"
+    # A version-managed node (nvm, fnm, asdf) lives under the home directory
+    # and is put on PATH by a shell profile launchd never reads. autostart.sh
+    # records the resolved path so a booth Mac does not depend on which shell
+    # started it — falling back to whatever PATH offers when it was not.
+    exec "${BELTPACK_NODE_BIN:-node}" "$REPO/token/server.mjs"
     ;;
   bridge)
     BIN="$REPO/server/.build/release/BeltpackBridge"
