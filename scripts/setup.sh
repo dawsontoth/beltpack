@@ -138,6 +138,19 @@ need() {
 need livekit-server livekit
 need lk livekit-cli
 need node node
+# Both apps are generated from a project.yml rather than a committed
+# .xcodeproj, so nothing builds without this.
+need xcodegen xcodegen
+
+# Xcode itself, which Homebrew cannot install and the Command Line Tools cannot
+# substitute for: the Mac host app is an Xcode project built with xcodebuild, so
+# this is needed even on a machine that will never see a phone.
+if xcodebuild -version >/dev/null 2>&1; then
+  skip "Xcode present ($(xcodebuild -version 2>/dev/null | head -1))"
+else
+  warn "Xcode not found, or xcode-select points at the Command Line Tools"
+  todo "Install Xcode from the App Store, then: sudo xcode-select -s /Applications/Xcode.app"
+fi
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
   if $DO_INSTALL || confirm "Install ${MISSING[*]} with Homebrew?"; then
