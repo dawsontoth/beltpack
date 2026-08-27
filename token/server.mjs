@@ -7,7 +7,10 @@
 // need updating at the wrong moment.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const {
   LIVEKIT_API_KEY,
@@ -37,6 +40,25 @@ if (LIVEKIT_API_SECRET.length < 32) {
   process.exit(1);
 }
 
+// The control panel writes .env when somebody turns talking on or off, so this
+// is read when a token is minted rather than when the process started. A booth
+// Mac should not need a restart to honour a switch that was flipped mid-service.
+// Whoever already holds a token keeps what it granted until they rejoin.
+const ENV_FILE = process.env.BELTPACK_ENV_FILE ??
+  join(dirname(fileURLToPath(import.meta.url)), "..", ".env");
+
+function canPublishNow() {
+  try {
+    const text = readFileSync(ENV_FILE, "utf8");
+    const match = text.match(/^\s*(?:export\s+)?BELTPACK_CAN_PUBLISH\s*=\s*"?([^"\n]*)"?/m);
+    if (match) return match[1].trim() === "true";
+  } catch {
+    // No readable .env: fall back to whatever this process was started with,
+    // which is what run.sh sourced from that same file.
+  }
+  return BELTPACK_CAN_PUBLISH === "true";
+}
+
 const base64url = (input) =>
   Buffer.from(input).toString("base64").replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 
@@ -52,7 +74,7 @@ function mint(identity) {
     video: {
       room: BELTPACK_ROOM,
       roomJoin: true,
-      canPublish: BELTPACK_CAN_PUBLISH === "true",
+      canPublish: canPublishNow(),
       canSubscribe: true,
       // Required for announcements: the text of a spoken cue travels on the
       // data channel. Without it the SFU silently drops the message while the

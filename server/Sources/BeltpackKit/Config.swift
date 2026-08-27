@@ -42,6 +42,10 @@ public struct Config: Sendable {
     public let inputChannel: Int?
     public let outputChannel: Int?
 
+    /// Whether phones may talk at all. The token service is what enforces it —
+    /// this copy exists so the control panel can show and change it.
+    public let canPublish: Bool
+
     public static func fromEnvironment() throws -> Config {
         try from(ProcessInfo.processInfo.environment)
     }
@@ -88,6 +92,7 @@ public struct Config: Sendable {
             outputDeviceHint: env["BELTPACK_OUTPUT_DEVICE"].flatMap { $0.isEmpty ? nil : $0 },
             inputChannel: channel(env["BELTPACK_INPUT_CHANNEL"]),
             outputChannel: channel(env["BELTPACK_OUTPUT_CHANNEL"]),
+            canPublish: (env["BELTPACK_CAN_PUBLISH"] ?? "true") == "true",
         )
     }
 }

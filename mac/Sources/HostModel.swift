@@ -102,7 +102,12 @@ final class HostModel: ObservableObject {
             return
         }
         do {
-            controller.config = try Config.fromEnvFile(URL(fileURLWithPath: envPath))
+            let url = URL(fileURLWithPath: envPath)
+            controller.config = try Config.fromEnvFile(url)
+            // So the control panel can write a change back to the same file it
+            // was read from, rather than only holding it until the next launch.
+            controller.envURL = url
+            controller.adoptConfig()
             configError = nil
             preselectFromConfig()
         } catch {

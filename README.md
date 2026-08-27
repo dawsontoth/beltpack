@@ -134,8 +134,15 @@ make admin
 ```
 
 Sign in with the management passcode. From there you can pick the console input
-and return output, watch who is on comms with live mute and speaking state,
-start and stop the bridge, and show pairing codes.
+and return output and the channel each one uses, turn talking on and off for
+every phone, watch who is on comms with live mute and speaking state, start and
+stop the bridge, and show pairing codes.
+
+Both settings are written back to `.env`, so they survive a restart rather than
+lasting until the next one. Changing a channel restarts the bridge, because the
+map is applied when the audio engine is built. Turning talking off does not
+restart anything: it applies when a phone next joins, and anyone already on
+comms keeps what their token granted them.
 
 Because it is a web page on the comms network, you can drive the booth Mac from
 a phone at the back of the room instead of from its keyboard — which is what
@@ -220,6 +227,14 @@ They work by putting a channel map on the audio units underneath LiveKit's
 audio engine, which is the supported way to say "channel 42 is the one I mean".
 The output map leaves every other channel silent rather than writing over it,
 so nothing else sharing that cable is disturbed.
+
+The control panel is the easier place to set these — it knows how many channels
+the chosen device actually has, so it refuses one that does not exist instead of
+letting it fail against the hardware:
+
+```
+WING has 2 output channels, so 42 does not exist
+```
 
 Whether it took is in the log, with the reason if it did not:
 

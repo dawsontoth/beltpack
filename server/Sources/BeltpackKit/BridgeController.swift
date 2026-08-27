@@ -47,6 +47,16 @@ public final class BridgeController: ObservableObject {
 
     public var config: Config?
 
+    /// Where `config` came from, so the control panel can write a change back
+    /// to the same file rather than only holding it until the next restart.
+    public var envURL: URL?
+
+    /// Settings the panel can change. Held here rather than read from `config`
+    /// each time, because `config` is a snapshot of the file as it was read.
+    @Published public private(set) var inputChannel: Int?
+    @Published public private(set) var outputChannel: Int?
+    @Published public private(set) var canPublish: Bool = true
+
     private let room = Room()
     private var publication: LocalTrackPublication?
 
@@ -98,15 +108,56 @@ public final class BridgeController: ObservableObject {
     /// engine exists, so it has to happen ahead of connecting rather than when
     /// a device is picked.
     private func applyChannelMap() {
-        guard let config else { return }
-        let channels = ChannelSelection(
-            inputChannel: config.inputChannel,
-            outputChannel: config.outputChannel,
-        )
+        let channels = ChannelSelection(inputChannel: inputChannel, outputChannel: outputChannel)
         guard channels.isActive else { return }
         // Chained ahead of the SDK's mixer rather than replacing it:
         // set(engineObservers:) overwrites the whole list.
         AudioManager.shared.set(engineObservers: [channels, AudioManager.shared.mixer])
+    }
+
+    /// Takes the settings the panel can change out of the loaded config. Call
+    /// after assigning `config`.
+    public func adoptConfig() {
+        inputChannel = config?.inputChannel
+        outputChannel = config?.outputChannel
+        canPublish = config?.canPublish ?? true
+    }
+
+    /// Changes which channels carry comms, and writes it back to `.env`.
+    ///
+    /// The map is applied when the audio engine is built, so a running bridge
+    /// has to be restarted for it to mean anything. Doing that here rather than
+    /// leaving it to the operator: a control that appears to work and silently
+    /// does not until something else happens is worse than a short dropout.
+    public func setChannels(input: Int?, output: Int?) async throws {
+        inputChannel = input
+        outputChannel = output
+        try persist([
+            "BELTPACK_INPUT_CHANNEL": input.map(String.init) ?? "",
+            "BELTPACK_OUTPUT_CHANNEL": output.map(String.init) ?? "",
+        ])
+        log.notice("channels set to input \(input.map(String.init) ?? "default", privacy: .public), output \(output.map(String.init) ?? "default", privacy: .public)")
+
+        if runState.wantsToRun {
+            await stop()
+            await start()
+        }
+    }
+
+    /// Turns talking on or off for every phone.
+    ///
+    /// Only written to `.env`: the token service is what enforces it, and it
+    /// reads the file when it mints. Nothing here needs restarting, but a phone
+    /// already holding a token keeps what it was given until it rejoins.
+    public func setCanPublish(_ allowed: Bool) throws {
+        canPublish = allowed
+        try persist(["BELTPACK_CAN_PUBLISH": allowed ? "true" : "false"])
+        log.notice("phones may talk: \(allowed, privacy: .public)")
+    }
+
+    private func persist(_ values: [String: String]) throws {
+        guard let envURL else { throw BridgeControllerError.noEnvFile }
+        try EnvFile.update(envURL, values)
     }
 
     // MARK: - Running
@@ -281,6 +332,17 @@ extension BridgeController: RoomDelegate {
             self.publication = nil
             self.participants = []
             self.scheduleReconnect(reason: error?.localizedDescription ?? "connection lost")
+        }
+    }
+}
+
+public enum BridgeControllerError: LocalizedError {
+    case noEnvFile
+
+    public var errorDescription: String? {
+        switch self {
+        case .noEnvFile:
+            "No .env file to write to — choose one from the menu bar first."
         }
     }
 }

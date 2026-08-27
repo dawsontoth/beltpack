@@ -95,8 +95,22 @@ enum AdminPage {
         <section class="card">
           <h2>Audio devices</h2>
           <label>Console in <select id="input"></select></label>
+          <label>Channel <input id="inputChannel" type="number" min="1" placeholder="first"></label>
           <label>Return out <select id="output"></select></label>
+          <label>Channel <input id="outputChannel" type="number" min="1" placeholder="first"></label>
+          <div class="sub">Blank takes whatever the device offers first, which is right for an
+            ordinary interface. A console needs the channel it actually carries comms on.
+            Changing this restarts the bridge.</div>
+          <div id="chanerr" class="err"></div>
           <div id="mic" class="sub"></div>
+        </section>
+
+        <section class="card">
+          <h2>Talking</h2>
+          <label class="row"><input id="canpublish" type="checkbox"> Phones may talk</label>
+          <div class="sub">Off makes every beltpack listen-only. Applies when a phone next
+            joins — anyone already on comms keeps what they were given.</div>
+          <div id="puberr" class="err"></div>
         </section>
 
         <section class="card">
@@ -126,7 +140,13 @@ enum AdminPage {
         headers: { ...(options.headers || {}), "X-Beltpack-Admin": pass },
       });
       if (res.status === 401) { lock("That passcode was rejected."); throw new Error("unauthorised"); }
-      if (!res.ok) throw new Error(`${res.status}`);
+      if (!res.ok) {
+        // Refusals explain themselves in the body. Without this the page would
+        // show "400" and throw away the sentence that says what to do about it.
+        let detail = `${res.status}`;
+        try { const body = await res.json(); if (body && body.error) detail = body.error; } catch { /* not JSON */ }
+        throw new Error(detail);
+      }
       return res.json();
     }
 
@@ -156,6 +176,13 @@ enum AdminPage {
       }
     }
 
+    // Never rewrite a field the operator is currently typing into.
+    function setField(id, value) {
+      const el = $(id);
+      if (document.activeElement === el) return;
+      el.value = value === null || value === undefined ? "" : value;
+    }
+
     function render(s) {
       $("lamp").dataset.s = s.state;
       $("state").textContent = {
@@ -173,6 +200,15 @@ enum AdminPage {
 
       fillDevices($("input"), s.inputs);
       fillDevices($("output"), s.outputs);
+      setField("inputChannel", s.inputChannel);
+      setField("outputChannel", s.outputChannel);
+      // The device's own count, so a channel that cannot exist is refused by
+      // the field rather than by the audio unit an hour later.
+      $("inputChannel").max = s.inputChannelMax ?? "";
+      $("outputChannel").max = s.outputChannelMax ?? "";
+      $("inputChannel").placeholder = s.inputChannelMax ? `first of ${s.inputChannelMax}` : "first";
+      $("outputChannel").placeholder = s.outputChannelMax ? `first of ${s.outputChannelMax}` : "first";
+      if (document.activeElement !== $("canpublish")) $("canpublish").checked = s.canPublish;
       $("mic").textContent = `Microphone access: ${s.micStatus}`;
 
       const people = $("people");
@@ -233,6 +269,47 @@ enum AdminPage {
         }));
       };
     }
+
+    // Both channels go up together: the server cannot tell an explicit null
+    // from a missing key, so "leave the other one alone" has to be said out
+    // loud by sending its current value.
+    function channelValue(id) {
+      const raw = $(id).value.trim();
+      if (raw === "") return null;
+      const n = Number(raw);
+      return Number.isInteger(n) && n >= 1 ? n : null;
+    }
+
+    for (const which of ["inputChannel", "outputChannel"]) {
+      $(which).onchange = async () => {
+        $("chanerr").textContent = "";
+        const body = JSON.stringify({
+          input: channelValue("inputChannel"),
+          output: channelValue("outputChannel"),
+        });
+        try {
+          render(await api("/admin/channels", {
+            method: "POST", headers: { "content-type": "application/json" }, body,
+          }));
+        } catch (e) {
+          $("chanerr").textContent = e.message;
+          refresh();
+        }
+      };
+    }
+
+    $("canpublish").onchange = async () => {
+      $("puberr").textContent = "";
+      const body = JSON.stringify({ allowed: $("canpublish").checked });
+      try {
+        render(await api("/admin/publish", {
+          method: "POST", headers: { "content-type": "application/json" }, body,
+        }));
+      } catch (e) {
+        $("puberr").textContent = e.message;
+        refresh();
+      }
+    };
 
     $("pair").onclick = async () => {
       const p = await api("/admin/pair");

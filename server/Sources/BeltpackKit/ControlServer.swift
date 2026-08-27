@@ -54,6 +54,10 @@ public final class ControlServer: @unchecked Sendable {
             return await .json(status())
         case ("POST", "/admin/devices"):
             return await selectDevices(request)
+        case ("POST", "/admin/channels"):
+            return await setChannels(request)
+        case ("POST", "/admin/publish"):
+            return await setPublish(request)
         case ("GET", "/admin/pair"):
             return await pairing()
         default:
@@ -98,6 +102,11 @@ public final class ControlServer: @unchecked Sendable {
         let canPair: Bool
         let inputs: [DeviceDTO]
         let outputs: [DeviceDTO]
+        let inputChannel: Int?
+        let outputChannel: Int?
+        let inputChannelMax: Int?
+        let outputChannelMax: Int?
+        let canPublish: Bool
         let participants: [ParticipantDTO]
     }
 
@@ -111,6 +120,20 @@ public final class ControlServer: @unchecked Sendable {
     private struct DeviceSelection: Decodable {
         let input: String?
         let output: String?
+    }
+
+    /// Both fields are always sent, because a single optional cannot tell
+    /// "clear this" from "leave it alone" — Decodable folds an explicit null
+    /// into the same absence as a missing key. So null or missing both mean no
+    /// channel map, and the page sends the current value for whichever half
+    /// the operator did not touch.
+    private struct ChannelSelectionRequest: Decodable {
+        let input: Int?
+        let output: Int?
+    }
+
+    private struct PublishRequest: Decodable {
+        let allowed: Bool
     }
 
     @MainActor
@@ -142,6 +165,13 @@ public final class ControlServer: @unchecked Sendable {
             canPair: controller.config?.clientURL != nil && controller.config?.passcode != nil,
             inputs: map(controller.inputs, selected: controller.selectedInput),
             outputs: map(controller.outputs, selected: controller.selectedOutput),
+            inputChannel: controller.inputChannel,
+            outputChannel: controller.outputChannel,
+            // What the picked device actually offers, so the page can refuse a
+            // channel that does not exist instead of letting it fail in the log.
+            inputChannelMax: controller.selectedInput?.channels,
+            outputChannelMax: controller.selectedOutput?.channels,
+            canPublish: controller.canPublish,
             participants: controller.participants.map {
                 ParticipantDTO(
                     id: $0.id, name: $0.name, isMuted: $0.isMuted,
@@ -167,6 +197,56 @@ public final class ControlServer: @unchecked Sendable {
             }
             return HTTPServer.Response.json(status())
         }
+    }
+
+    private func setChannels(_ request: HTTPServer.Request) async -> HTTPServer.Response {
+        guard let selection = request.json(ChannelSelectionRequest.self) else {
+            return .json(["error": "expected {input?, output?} as 1-based channel numbers, or null"], status: 400)
+        }
+
+        let input = selection.input
+        let output = selection.output
+
+        // Checked here rather than left to fail against the hardware: the
+        // audio unit reports a status nobody is watching, and the result is a
+        // service running on a channel that carries nothing.
+        let problem = await MainActor.run {
+            validate(input, direction: .input) ?? validate(output, direction: .output)
+        }
+        if let problem {
+            return .json(["error": problem], status: 400)
+        }
+
+        do {
+            try await controller.setChannels(input: input, output: output)
+        } catch {
+            return .json(["error": error.localizedDescription], status: 500)
+        }
+        return await .json(status())
+    }
+
+    @MainActor
+    private func validate(_ channel: Int?, direction: AudioDirection) -> String? {
+        guard let channel else { return nil }
+        guard channel >= 1 else { return "\(direction.label) channel must be 1 or more" }
+        let device = direction == .input ? controller.selectedInput : controller.selectedOutput
+        guard let device else { return nil }
+        guard channel <= device.channels else {
+            return "\(device.name) has \(device.channels) \(direction.label) channels, so \(channel) does not exist"
+        }
+        return nil
+    }
+
+    private func setPublish(_ request: HTTPServer.Request) async -> HTTPServer.Response {
+        guard let body = request.json(PublishRequest.self) else {
+            return .json(["error": "expected {allowed: true|false}"], status: 400)
+        }
+        do {
+            try await MainActor.run { try controller.setCanPublish(body.allowed) }
+        } catch {
+            return .json(["error": error.localizedDescription], status: 500)
+        }
+        return await .json(status())
     }
 
     private func pairing() async -> HTTPServer.Response {
