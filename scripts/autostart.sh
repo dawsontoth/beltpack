@@ -175,7 +175,13 @@ verify() {
 
     if (( failures > 0 )); then
         echo
-        warn "check the logs: make logs, or make mac-logs-past"
+        if ! pgrep -x BeltpackHost >/dev/null; then
+            # There is no menu bar icon until the app runs, so pointing at one
+            # sends somebody looking for something that is not there.
+            warn "the host app is not running, so there is no menu bar icon yet"
+            warn "build it with 'make mac', then re-run this"
+        fi
+        warn "logs: make logs, make mac-logs-past SINCE=10m, or logs/bridge.log"
         return 1
     fi
 }

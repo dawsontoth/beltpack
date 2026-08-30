@@ -74,10 +74,16 @@ ADMIN_PORT="${BELTPACK_ADMIN_PORT:-7884}"
 # concatenate into something that matches neither.
 if curl -s -o /dev/null -m 2 "http://127.0.0.1:$ADMIN_PORT/" 2>/dev/null; then
   echo "Control:  http://127.0.0.1:$ADMIN_PORT/"
+elif pgrep -x BeltpackHost >/dev/null; then
+  echo "Control:  not responding, but the host app is running — click the"
+  echo "          Beltpack icon in the menu bar; it says why, and lets you pick"
+  echo "          the .env by hand."
 else
-  echo "Control:  not responding — click the Beltpack icon in the menu bar; it"
-  echo "          shows why, and lets you pick the .env by hand. If the app was"
-  echo "          already running, quit it from there and rerun make up."
+  # No icon to click: telling somebody to click one is how a diagnostic wastes
+  # the minute it was meant to save.
+  echo "Control:  not responding, and the host app is not running — there is no"
+  echo "          menu bar icon until it is. Build and start it with 'make mac',"
+  echo "          then check 'make mac-logs-past SINCE=10m' and logs/bridge.log."
 fi
 [[ -n "${BELTPACK_CLIENT_URL:-}" ]] && echo "Phones:   $BELTPACK_CLIENT_URL"
 echo
