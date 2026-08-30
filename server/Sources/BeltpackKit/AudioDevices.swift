@@ -157,6 +157,51 @@ public enum AudioDevices {
         return value as String
     }
 
+    /// Whether the device is actually there and ready to run.
+    ///
+    /// Channel count alone is not enough. A console that has just been powered
+    /// on, or a virtual device standing in for one that is off, can advertise
+    /// channels while having no usable format behind them — and the first thing
+    /// that notices is AVAudioEngine, which reports it by throwing an
+    /// Objective-C exception on an audio thread and taking the process down.
+    ///
+    /// Asked through Core Audio rather than by opening an engine to find out:
+    /// building an AVAudioEngine to inspect a bad input segfaults inside
+    /// AVFAudio, which is a worse answer than the question.
+    public static func isReady(_ id: AudioObjectID, _ direction: AudioDirection) -> Bool {
+        guard channelCount(id, direction) > 0 else { return false }
+        guard numberProperty(id, kAudioDevicePropertyDeviceIsAlive) == 1 else { return false }
+        return sampleRate(id) > 0
+    }
+
+    private static func sampleRate(_ id: AudioObjectID) -> Double {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+        var value: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        let status = withUnsafeMutablePointer(to: &value) {
+            AudioObjectGetPropertyData(id, &addr, 0, nil, &size, $0)
+        }
+        return status == noErr ? Double(value) : 0
+    }
+
+    private static func numberProperty(_ id: AudioObjectID, _ selector: AudioObjectPropertySelector) -> UInt32 {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = withUnsafeMutablePointer(to: &value) {
+            AudioObjectGetPropertyData(id, &addr, 0, nil, &size, $0)
+        }
+        return status == noErr ? value : 0
+    }
+
     private static func channelCount(_ id: AudioObjectID, _ direction: AudioDirection) -> Int {
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,

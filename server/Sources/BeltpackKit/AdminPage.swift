@@ -33,7 +33,7 @@ enum AdminPage {
       .row{display:flex;align-items:center;gap:12px}
       .lamp{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
       .lamp[data-s=running]{background:var(--green)}
-      .lamp[data-s=starting],.lamp[data-s=reconnecting]{background:var(--amber)}
+      .lamp[data-s=starting],.lamp[data-s=reconnecting],.lamp[data-s=waiting]{background:var(--amber)}
       .lamp[data-s=failed]{background:var(--red)}
       .grow{flex:1;min-width:0}
       .state{font-weight:600}
@@ -207,7 +207,8 @@ enum AdminPage {
       $("lamp").dataset.s = s.state;
       $("state").textContent = {
         running: "On air", stopped: "Stopped", starting: "Starting…",
-        reconnecting: "Reconnecting…", failed: "Failed",
+        reconnecting: "Reconnecting…", waiting: "Waiting for the console",
+        failed: "Failed",
       }[s.state] || s.state;
       $("detail").textContent = s.message || (s.room ? `Room "${s.room}" at ${s.url}` : "");
 

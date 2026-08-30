@@ -25,9 +25,12 @@ public final class BridgeController: ObservableObject {
         case starting
         case running
         case reconnecting
+        /// The console is powered down. Normal here — it cycles with the sound
+        /// system — so it is a state of its own rather than a failure.
+        case waitingForConsole
         case failed(String)
 
-        public var isBusy: Bool { self == .starting || self == .reconnecting }
+        public var isBusy: Bool { self == .starting || self == .reconnecting || self == .waitingForConsole }
         public var isRunning: Bool { self == .running }
         /// Whether the bridge believes it should be on air, whether or not it
         /// currently is. Used to decide if a drop deserves a retry.
@@ -79,6 +82,7 @@ public final class BridgeController: ObservableObject {
     /// retrying if nobody asked it to stop.
     private var shouldRun = false
     private var reconnectTask: Task<Void, Never>?
+    private var consoleWatch: Task<Void, Never>?
 
     public init() {
         room.add(delegate: self)
@@ -102,6 +106,20 @@ public final class BridgeController: ObservableObject {
         _ = await Microphone.ensureAccess()
         micStatus = Microphone.statusDescription
         refreshDevices()
+    }
+
+    /// The console's own device, and only if it is really present.
+    ///
+    /// Matched by the configured hint rather than by whatever is currently
+    /// selected: when the console powers down, macOS moves the default input
+    /// elsewhere, and "some input exists" is not the question worth asking.
+    private func consoleInput() -> AudioInput? {
+        guard let hint = config?.inputDeviceHint.lowercased(), !hint.isEmpty else {
+            return selectedInput
+        }
+        return AudioDevices.list(.input).first {
+            $0.name.lowercased().contains(hint) && AudioDevices.isReady($0.id, .input)
+        }
     }
 
     private func applyInput() {
@@ -196,6 +214,7 @@ public final class BridgeController: ObservableObject {
         shouldRun = true
         applyCaptureGain()
         applyChannelMap()
+        watchConsole()
         await connectAndPublish()
     }
 
@@ -212,11 +231,36 @@ public final class BridgeController: ObservableObject {
             return
         }
 
+        // Publishing with no usable input makes AVAudioEngine throw
+        // 'Input HW format is invalid' from inside LiveKit's own observer. That
+        // is an Objective-C exception on a WebRTC thread, which Swift cannot
+        // catch, so the process dies — and the LaunchAgent restarts it straight
+        // back into the same crash, which is a menu bar icon that flickers and
+        // a booth Mac that never comes up.
+        //
+        // The console is powered down between services, so this is an ordinary
+        // state. Wait for it instead, using the same backoff a dropped
+        // connection uses.
+        // Capture from the console, not from whatever macOS made the default
+        // when the console went away. Without this the check below asks about
+        // one device and the engine opens another — and the one it opens is
+        // exactly the leftover virtual device that cannot be opened.
+        refreshDevices()
+        if let console = consoleInput() {
+            selectedInput = console
+        }
+        applyInput()
+        if config.subscribes { applyOutput() }
+
+        guard consoleInput() != nil else {
+            log.notice("\(config.inputDeviceHint, privacy: .public) is not present — waiting for it")
+            scheduleReconnect(reason: "console not present", state: .waitingForConsole)
+            return
+        }
+
         runState = .starting
         log.notice("starting room \(config.room, privacy: .public) at \(config.livekitURL, privacy: .public)")
         log.notice("input \(self.selectedInput?.name ?? "none", privacy: .public), output \(self.selectedOutput?.name ?? "none", privacy: .public)")
-        applyInput()
-        if config.subscribes { applyOutput() }
 
         do {
             let token = try AccessToken.mint(
@@ -263,9 +307,9 @@ public final class BridgeController: ObservableObject {
     /// Retries with backoff. A LiveKit restart, a Mac waking, or services
     /// coming up in the wrong order all leave the bridge connected to nothing;
     /// without this it sits there looking healthy while comms is dead.
-    private func scheduleReconnect(reason: String) {
+    private func scheduleReconnect(reason: String, state: RunState = .reconnecting) {
         guard shouldRun, reconnectTask == nil else { return }
-        runState = .reconnecting
+        runState = state
         log.error("disconnected (\(reason, privacy: .public)) — retrying")
 
         reconnectTask = Task { [weak self] in
@@ -284,6 +328,42 @@ public final class BridgeController: ObservableObject {
         }
     }
 
+    /// Notices the console going away while the bridge is live.
+    ///
+    /// Waiting for LiveKit to discover it is not safe: the failure it
+    /// eventually hits is an Objective-C exception on an audio thread, which
+    /// takes the process with it. Stepping out of the way first turns a crash
+    /// into a pause, and the reconnect loop brings it back when the desk
+    /// powers up again.
+    private func watchConsole() {
+        guard consoleWatch == nil else { return }
+        consoleWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self else { return }
+                await self.checkConsoleStillThere()
+            }
+        }
+    }
+
+    private func checkConsoleStillThere() async {
+        guard shouldRun, runState.isRunning else { return }
+        refreshDevices()
+        guard consoleInput() == nil else { return }
+
+        log.notice("the console went away — standing down until it returns")
+        if let publication {
+            try? await room.localParticipant.unpublish(publication: publication)
+        }
+        publication = nil
+        await room.disconnect()
+        participants = []
+        // Selected device is stale now; let it be picked again when the
+        // console reappears rather than pointing at whatever replaced it.
+        selectedInput = nil
+        scheduleReconnect(reason: "console not present", state: .waitingForConsole)
+    }
+
     private func attemptReconnect() async {
         log.notice("reconnect attempt")
         await connectAndPublish()
@@ -297,6 +377,8 @@ public final class BridgeController: ObservableObject {
         shouldRun = false
         reconnectTask?.cancel()
         reconnectTask = nil
+        consoleWatch?.cancel()
+        consoleWatch = nil
 
         if let publication {
             try? await room.localParticipant.unpublish(publication: publication)

@@ -153,6 +153,9 @@ public final class ControlServer: @unchecked Sendable {
         case .starting: state = "starting"
         case .running: state = "running"
         case .reconnecting: state = "reconnecting"
+        case .waitingForConsole:
+            state = "waiting"
+            message = "Waiting for \(controller.config?.inputDeviceHint ?? "the console") to come back."
         case let .failed(reason):
             state = "failed"
             message = reason

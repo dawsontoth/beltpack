@@ -50,6 +50,26 @@ public final class ChannelSelection: AudioEngineObserver, @unchecked Sendable {
             return
         }
 
+        // Asking for a channel the device does not have is not a refusal from
+        // Core Audio: the property is accepted, the node's format becomes
+        // something the engine cannot connect, and AVAudioEngine throws an
+        // NSException from inside LiveKit's own observer. That is not catchable
+        // from Swift, so the app dies — and with the agent restarting it, dies
+        // over and over with only a flicker in the menu bar to show for it.
+        //
+        // The console is powered down between services, so a missing device is
+        // an ordinary state here rather than a fault. Leave the channel alone
+        // and let the default path run: comms on the wrong channel is worth
+        // saying out loud, but it is not worth taking the Mac down for.
+        guard let total = channelCount(.input), total > 0 else {
+            log.error("no input device to select channel \(channel, privacy: .public) on — is the console powered on?")
+            return
+        }
+        guard channel <= total else {
+            log.error("input channel \(channel, privacy: .public) but the device has only \(total, privacy: .public)")
+            return
+        }
+
         // Output scope, element 1: one entry per channel coming out of the
         // unit, each holding the device channel that feeds it. One entry, so
         // comms is mono — which is what a headset ring is.
@@ -78,8 +98,8 @@ public final class ChannelSelection: AudioEngineObserver, @unchecked Sendable {
             log.error("no output audio unit — cannot select channel \(channel, privacy: .public)")
             return
         }
-        guard let total = defaultOutputChannelCount() else {
-            log.error("could not read the output device's channel count")
+        guard let total = channelCount(.output), total > 0 else {
+            log.error("no output device to select channel \(channel, privacy: .public) on")
             return
         }
         guard channel <= total else {
@@ -108,9 +128,15 @@ public final class ChannelSelection: AudioEngineObserver, @unchecked Sendable {
         }
     }
 
-    private func defaultOutputChannelCount() -> Int? {
-        guard let id = AudioDevices.currentDefaultOutput() else { return nil }
-        return AudioDevices.list(.output).first { $0.id == id }?.channels
+    /// What the device the engine will actually use has, which is the system
+    /// default — not whatever was picked in the UI, since those can differ
+    /// while a device is coming or going.
+    private func channelCount(_ direction: AudioDirection) -> Int? {
+        let id = direction == .input
+            ? AudioDevices.currentDefaultInput()
+            : AudioDevices.currentDefaultOutput()
+        guard let id else { return nil }
+        return AudioDevices.list(direction).first { $0.id == id }?.channels
     }
 }
 #endif

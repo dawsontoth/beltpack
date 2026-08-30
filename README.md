@@ -369,6 +369,26 @@ Two watch settings matter alongside that, and an app cannot set either:
 The watch is never the audio path, so it does not need to run in the
 background — only to be in front when a wrist comes up.
 
+## When the console is powered down
+
+The desk cycles with the sound system; the Mac stays on. So the console being
+absent is an ordinary state, not a fault, and the bridge treats it as one: it
+waits, retrying with the same backoff a dropped connection uses, and comes back
+on air by itself when the desk powers up. The menu bar shows a plug rather than
+a warning triangle, and the control panel says what it is waiting for.
+
+This is worth more than tidiness. Publishing with no usable input makes
+AVAudioEngine throw *'Input HW format is invalid'* from inside LiveKit's own
+observer — an Objective-C exception on an audio thread, which Swift cannot
+catch. The process dies, the LaunchAgent restarts it, and it dies again: a menu
+bar icon that flickers and a booth Mac that never comes up.
+
+The check is which device the console feed is actually on, by the name in
+`BELTPACK_INPUT_DEVICE`, and it is selected before anything opens it — not left
+to whichever device macOS promoted to default when the console vanished, which
+on a Mac with Teams or Zoom installed is a virtual device that cannot be opened
+at all.
+
 ## Reconnection
 
 LiveKit handles short outages itself. Past the point where it gives up — a

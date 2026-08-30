@@ -154,6 +154,10 @@ final class HostModel: ObservableObject {
         switch controller.runState {
         case .running: "dot.radiowaves.left.and.right"
         case .starting, .reconnecting: "ellipsis"
+        // Not an error symbol: the console being off is expected between
+        // services, and a warning triangle every Sunday morning teaches people
+        // to ignore warning triangles.
+        case .waitingForConsole: "powerplug"
         case .failed: "exclamationmark.triangle"
         case .stopped: "pause"
         }
@@ -166,6 +170,8 @@ final class HostModel: ObservableObject {
             return others == 1 ? "On air, 1 beltpack" : "On air, \(others) beltpacks"
         case .starting: return "Starting…"
         case .reconnecting: return "Reconnecting…"
+        case .waitingForConsole:
+            return "Waiting for \(controller.config?.inputDeviceHint ?? "the console")"
         case let .failed(message): return "Failed: \(message)"
         case .stopped: return "Stopped"
         }
