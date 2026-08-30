@@ -58,6 +58,8 @@ public final class ControlServer: @unchecked Sendable {
             return await setChannels(request)
         case ("POST", "/admin/publish"):
             return await setPublish(request)
+        case ("POST", "/admin/gain"):
+            return await setGain(request)
         case ("GET", "/admin/pair"):
             return await pairing()
         default:
@@ -107,6 +109,8 @@ public final class ControlServer: @unchecked Sendable {
         let inputChannelMax: Int?
         let outputChannelMax: Int?
         let canPublish: Bool
+        let inputGain: Double
+        let inputLevel: Float
         let participants: [ParticipantDTO]
     }
 
@@ -134,6 +138,10 @@ public final class ControlServer: @unchecked Sendable {
 
     private struct PublishRequest: Decodable {
         let allowed: Bool
+    }
+
+    private struct GainRequest: Decodable {
+        let decibels: Double
     }
 
     @MainActor
@@ -172,6 +180,8 @@ public final class ControlServer: @unchecked Sendable {
             inputChannelMax: controller.selectedInput?.channels,
             outputChannelMax: controller.selectedOutput?.channels,
             canPublish: controller.canPublish,
+            inputGain: controller.inputGain,
+            inputLevel: controller.inputLevel,
             participants: controller.participants.map {
                 ParticipantDTO(
                     id: $0.id, name: $0.name, isMuted: $0.isMuted,
@@ -243,6 +253,28 @@ public final class ControlServer: @unchecked Sendable {
         }
         do {
             try await MainActor.run { try controller.setCanPublish(body.allowed) }
+        } catch {
+            return .json(["error": error.localizedDescription], status: 500)
+        }
+        return await .json(status())
+    }
+
+    /// The range is wide because a desk output can be genuinely quiet, and
+    /// bounded because past a point this is amplifying the noise floor rather
+    /// than the signal, and the fix belongs on the console.
+    private static let gainRange: ClosedRange<Double> = -24 ... 24
+
+    private func setGain(_ request: HTTPServer.Request) async -> HTTPServer.Response {
+        guard let body = request.json(GainRequest.self) else {
+            return .json(["error": "expected {decibels: number}"], status: 400)
+        }
+        guard Self.gainRange.contains(body.decibels) else {
+            return .json([
+                "error": "trim must be between \(Int(Self.gainRange.lowerBound)) and \(Int(Self.gainRange.upperBound)) dB",
+            ], status: 400)
+        }
+        do {
+            try await MainActor.run { try controller.setInputGain(body.decibels) }
         } catch {
             return .json(["error": error.localizedDescription], status: 500)
         }

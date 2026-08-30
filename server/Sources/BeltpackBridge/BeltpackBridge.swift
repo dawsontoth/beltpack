@@ -132,6 +132,14 @@ struct BeltpackBridge {
             log("returning phone audio to \(output.name) (\(output.channels) ch)")
         }
 
+        // The same trim the Mac app applies, so a headless bridge and a
+        // supervised one sound the same.
+        if config.inputGain != 0 {
+            let capture = CaptureGain(gain: AudioMeter.gain(decibels: config.inputGain))
+            AudioManager.shared.capturePostProcessingDelegate = capture
+            log("console feed trim \(Int(config.inputGain)) dB")
+        }
+
         // Before anything builds an audio engine: a console puts 48 channels
         // down one cable and WebRTC would otherwise take whichever comes
         // first. Chained ahead of the SDK's own mixer rather than replacing

@@ -57,6 +57,16 @@ public final class BridgeController: ObservableObject {
     @Published public private(set) var outputChannel: Int?
     @Published public private(set) var canPublish: Bool = true
 
+    /// Trim on the console feed, in decibels. Held as decibels because that is
+    /// what it is set in; the processor keeps the multiplier.
+    @Published public private(set) var inputGain: Double = 0
+
+    /// How loud the console feed actually is, 0…1 on a dBFS scale. Without
+    /// this the gain is set by ear over a headset in another room.
+    public var inputLevel: Float { captureGain.level }
+
+    private let captureGain = CaptureGain()
+
     private let room = Room()
     private var publication: LocalTrackPublication?
 
@@ -107,6 +117,12 @@ public final class BridgeController: ObservableObject {
     /// Which channel of the selected device carries comms. Read before the
     /// engine exists, so it has to happen ahead of connecting rather than when
     /// a device is picked.
+    /// Installs the trim on the capture path. Set once; the multiplier is
+    /// changed in place afterwards.
+    private func applyCaptureGain() {
+        AudioManager.shared.capturePostProcessingDelegate = captureGain
+    }
+
     private func applyChannelMap() {
         let channels = ChannelSelection(inputChannel: inputChannel, outputChannel: outputChannel)
         guard channels.isActive else { return }
@@ -121,6 +137,19 @@ public final class BridgeController: ObservableObject {
         inputChannel = config?.inputChannel
         outputChannel = config?.outputChannel
         canPublish = config?.canPublish ?? true
+        inputGain = config?.inputGain ?? 0
+        captureGain.gain = AudioMeter.gain(decibels: inputGain)
+    }
+
+    /// Changes the trim on the console feed, and writes it back to `.env`.
+    ///
+    /// Takes effect on the next buffer — nothing restarts, because the
+    /// processor is already in the path and only its multiplier changes.
+    public func setInputGain(_ decibels: Double) throws {
+        inputGain = decibels
+        captureGain.gain = AudioMeter.gain(decibels: decibels)
+        try persist(["BELTPACK_INPUT_GAIN": String(format: "%.0f", decibels)])
+        log.notice("console feed trim set to \(decibels, privacy: .public) dB")
     }
 
     /// Changes which channels carry comms, and writes it back to `.env`.
@@ -165,6 +194,7 @@ public final class BridgeController: ObservableObject {
     public func start() async {
         guard case .stopped = runState else { return }
         shouldRun = true
+        applyCaptureGain()
         applyChannelMap()
         await connectAndPublish()
     }

@@ -45,20 +45,22 @@ enum Settings {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: Key.talkMode) }
     }
 
-    /// Personal trims, unity at 1.0. Capped at 2 rather than the SDK's 10:
-    /// past a modest boost you are amplifying room noise, and on comms that
-    /// is everyone's problem rather than only your own.
-    static let gainRange: ClosedRange<Double> = 0 ... 2
+    /// Personal trims, unity at 1.0. Capped well below the SDK's 10, but no
+    /// longer at 2: a console feed can arrive genuinely quiet, and +6 dB was
+    /// not enough to rescue one. The console trim in the control panel is the
+    /// better place to fix that — it runs before the audio is encoded — but
+    /// this is the control a volunteer actually has in their hand.
+    static let gainRange: ClosedRange<Double> = 0 ... 8
 
     /// The same range in decibels, which is what the sliders actually work in.
     ///
-    /// Snapping the multiplier to whole numbers would offer 0, 1 and 2 and
-    /// nothing else. Whole decibels give thirty usable positions and put unity
-    /// exactly on one of them, which is the value people reach for.
-    /// +6 dB is 1.995, a fifth of a percent under the cap above and 0.02 dB
-    /// short of it — near enough that the slider reaches the top in practice,
-    /// while the cap stays the one real limit.
-    static let decibelRange: ClosedRange<Double> = -24 ... 6
+    /// Snapping the multiplier to whole numbers would offer a handful of
+    /// values and nothing between them. Whole decibels give a position per
+    /// step and put unity exactly on one of them, which is the value people
+    /// reach for. +18 dB is 7.94, a fraction under the cap above — near enough
+    /// that the slider reaches the top in practice, while the cap stays the
+    /// one real limit.
+    static let decibelRange: ClosedRange<Double> = -24 ... 18
 
     static func decibels(fromGain gain: Double) -> Double {
         guard gain > 0 else { return decibelRange.lowerBound }

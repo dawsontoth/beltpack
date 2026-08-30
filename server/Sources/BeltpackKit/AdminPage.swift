@@ -106,6 +106,19 @@ enum AdminPage {
         </section>
 
         <section class="card">
+          <h2>Console feed</h2>
+          <div class="meter"><div id="lvl"></div></div>
+          <label>Trim
+            <input id="gain" type="range" min="-24" max="24" step="1" value="0">
+            <output id="gainv">0 dB</output>
+          </label>
+          <div class="sub">Applied before the audio is encoded, so a soft desk output is
+            fixed once here rather than by every phone. Aim for the meter to sit around
+            two thirds on normal speech.</div>
+          <div id="gainerr" class="err"></div>
+        </section>
+
+        <section class="card">
           <h2>Talking</h2>
           <label class="row"><input id="canpublish" type="checkbox"> Phones may talk</label>
           <div class="sub">Off makes every beltpack listen-only. Applies when a phone next
@@ -120,6 +133,13 @@ enum AdminPage {
         </section>
       </div>
     </main>
+
+    <style>
+      .meter { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-bottom: 6px; }
+      .meter > div { height: 100%; width: 0; border-radius: 5px; transition: width .08s linear; background: #30d158; }
+      .meter > div[data-hot="warm"] { background: #ff9f0a; }
+      .meter > div[data-hot="hot"] { background: #ff453a; }
+    </style>
 
     <dialog id="pairdlg">
       <h2>Pair a beltpack</h2>
@@ -209,6 +229,16 @@ enum AdminPage {
       $("inputChannel").placeholder = s.inputChannelMax ? `first of ${s.inputChannelMax}` : "first";
       $("outputChannel").placeholder = s.outputChannelMax ? `first of ${s.outputChannelMax}` : "first";
       if (document.activeElement !== $("canpublish")) $("canpublish").checked = s.canPublish;
+
+      const lvl = $("lvl");
+      lvl.style.width = `${Math.round((s.inputLevel || 0) * 100)}%`;
+      // Same thresholds the phones use, so "hot" means the same thing wherever
+      // somebody is looking at it.
+      lvl.dataset.hot = s.inputLevel > 0.95 ? "hot" : s.inputLevel > 0.8 ? "warm" : "";
+      if (document.activeElement !== $("gain")) {
+        $("gain").value = s.inputGain;
+        $("gainv").textContent = `${s.inputGain > 0 ? "+" : ""}${s.inputGain} dB`;
+      }
       $("mic").textContent = `Microphone access: ${s.micStatus}`;
 
       const people = $("people");
@@ -298,6 +328,26 @@ enum AdminPage {
       };
     }
 
+    // Moving the slider updates the readout continuously but only sends on
+    // release: every intermediate value would otherwise be written to .env.
+    $("gain").oninput = () => {
+      const v = Number($("gain").value);
+      $("gainv").textContent = `${v > 0 ? "+" : ""}${v} dB`;
+    };
+
+    $("gain").onchange = async () => {
+      $("gainerr").textContent = "";
+      const body = JSON.stringify({ decibels: Number($("gain").value) });
+      try {
+        render(await api("/admin/gain", {
+          method: "POST", headers: { "content-type": "application/json" }, body,
+        }));
+      } catch (e) {
+        $("gainerr").textContent = e.message;
+        refresh();
+      }
+    };
+
     $("canpublish").onchange = async () => {
       $("puberr").textContent = "";
       const body = JSON.stringify({ allowed: $("canpublish").checked });
@@ -332,7 +382,9 @@ enum AdminPage {
     $("closepair").onclick = () => $("pairdlg").close();
 
     if (pass) { unlock(); refresh(); } else { lock(); }
-    setInterval(refresh, 1500);
+    // Fast enough for the console meter to be worth looking at while setting a
+    // trim. The payload is small and this is a loopback request.
+    setInterval(refresh, 400);
     </script>
     </body>
     </html>

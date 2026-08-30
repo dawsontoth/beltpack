@@ -211,6 +211,22 @@ values worth knowing.
 | `BELTPACK_CAN_PUBLISH` | Whether phones may talk. |
 | `BELTPACK_SUBSCRIBE` | Whether the bridge returns phone audio to the console. |
 
+## A soft console feed
+
+Fix it once, on the **Console feed** card in the control panel, rather than on
+every phone. That trim runs before the audio is encoded, so it amplifies the
+signal; a phone turning itself up afterwards amplifies what the encoder made of
+a quiet signal along with it. It is also one control instead of one per
+volunteer, and it is stored in `.env` as `BELTPACK_INPUT_GAIN`.
+
+The card carries a meter so the trim can be set by eye — aim for around two
+thirds on normal speech. It is a decaying peak rather than an instantaneous
+level, so it shows the peaks instead of whichever ten milliseconds the page
+happened to ask about.
+
+The range is -24 to +24 dB. Past that you are amplifying the noise floor rather
+than the signal, and the fix belongs on the console.
+
 ## Channels on a console
 
 An ordinary interface has two channels and no question to answer. A WING has
@@ -295,7 +311,7 @@ Each beltpack carries its own trims. **You hear** is applied per remote track an
 re-applied to tracks that arrive later, so turning things down is not undone by
 somebody joining. **They hear you** runs in the capture post-processing hook,
 after echo cancellation and noise suppression, so turning yourself up does not
-turn up what those were removing. Both cap at +6 dB.
+turn up what those were removing. Both run from -24 to +18 dB.
 
 The sliders move in whole decibels, so unity is a position you land on rather
 than hunt for, with a haptic detent on each step and a firmer one at unity. The

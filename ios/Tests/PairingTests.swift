@@ -97,16 +97,21 @@ struct GainTests {
     @Test("the top of the decibel range reaches the cap without exceeding it")
     func topOfRange() {
         let top = Settings.gain(fromDecibels: Settings.decibelRange.upperBound)
-        // +6 dB is 1.995 rather than exactly 2. What matters is that the
-        // slider gets within a whisker of the cap and never past it — a
-        // multiplier above the cap would be a limit that does not hold.
+        // The top of the decibel range never lands exactly on the multiplier
+        // cap — +18 dB is 7.94, not 8. What matters is that the slider gets
+        // within a whisker of the cap and never past it: a multiplier above
+        // the cap would be a limit that does not hold.
         #expect(top <= Settings.gainRange.upperBound)
-        #expect(top > Settings.gainRange.upperBound - 0.01)
+        #expect(top > Settings.gainRange.upperBound * 0.99)
     }
 
     @Test("whole decibels round-trip without drifting")
     func roundTrip() {
-        for decibels in stride(from: -24.0, through: 6.0, by: 1) {
+        // Driven from the range itself, so widening it widens the test rather
+        // than leaving it quietly checking the old bounds.
+        for decibels in stride(from: Settings.decibelRange.lowerBound,
+                               through: Settings.decibelRange.upperBound, by: 1)
+        {
             let gain = Settings.gain(fromDecibels: decibels)
             #expect(abs(Settings.decibels(fromGain: gain) - decibels) < 0.001)
         }

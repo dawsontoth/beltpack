@@ -46,6 +46,11 @@ public struct Config: Sendable {
     /// this copy exists so the control panel can show and change it.
     public let canPublish: Bool
 
+    /// Trim applied to the console feed on the way in, in decibels. A soft
+    /// desk output is fixed here rather than on every phone, because this runs
+    /// before Opus does.
+    public let inputGain: Double
+
     public static func fromEnvironment() throws -> Config {
         try from(ProcessInfo.processInfo.environment)
     }
@@ -93,6 +98,7 @@ public struct Config: Sendable {
             inputChannel: channel(env["BELTPACK_INPUT_CHANNEL"]),
             outputChannel: channel(env["BELTPACK_OUTPUT_CHANNEL"]),
             canPublish: (env["BELTPACK_CAN_PUBLISH"] ?? "true") == "true",
+            inputGain: Double(env["BELTPACK_INPUT_GAIN"] ?? "") ?? 0,
         )
     }
 }
