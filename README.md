@@ -472,6 +472,99 @@ to the handsets.
 
 ---
 
+# Uninstalling
+
+Only the first step's order matters. While the agents are installed, launchd
+restarts anything you stop, so take them out before stopping anything by hand.
+
+## 1. Stop it
+
+```bash
+make no-autostart
+```
+
+```bash
+make down
+```
+
+`make no-autostart` unloads the three agents, deletes their plists from
+`~/Library/LaunchAgents`, and names any that will not go. `make down` catches
+whatever `make up` started. Then check that nothing is still holding a port:
+
+```bash
+lsof -nP -iTCP:7880-7884 -sTCP:LISTEN
+```
+
+No output means it has all stopped.
+
+## 2. Clear it off the Mac
+
+```bash
+defaults delete org.beltpack.BeltpackHost
+```
+
+```bash
+tccutil reset Microphone org.beltpack.BeltpackHost
+```
+
+The first removes the host app's preferences, chiefly the remembered `.env`
+path. They are the only thing it keeps outside the checkout. The second takes back its microphone permission,
+so a reinstall asks again rather than inheriting the old grant.
+
+`make devices` asked for the microphone as Terminal.app, not as Beltpack. That
+grant covers everything else you run in Terminal too, so it is left alone here.
+If you want it gone, it is under System Settings → Privacy & Security →
+**Microphone**.
+
+Then delete the checkout. `.env`, the logs, the build output and
+`ios/Local.xcconfig` all go with it. Outside the checkout there are only
+`make phone`'s build in `/tmp/bp-dev`, which a reboot clears, and Xcode's own
+`~/Library/Developer/Xcode/DerivedData/Beltpack-*` and `BeltpackHost-*` if you
+ever opened the projects in Xcode.
+
+Keep a copy of `.env` if this might come back. `setup.sh` never replaces a
+secret it finds, so restoring the file keeps the same passcodes. A fresh setup
+generates new ones, and every pairing code already handed out stops working —
+which is the point if a code was the reason you are uninstalling.
+
+## 3. Undo the appliance settings
+
+Only if this Mac is going back to ordinary use:
+
+```bash
+sudo pmset -a disablesleep 0 autorestart 0
+```
+
+`sleep 0` switched sleep off, so set the timing again in System Settings →
+**Energy**. Turn off **Automatically log in as** in Users & Groups — it is the
+setting with a security cost, because anyone who power-cycles the Mac gets a
+logged-in session. Then turn automatic macOS updates back on.
+
+## 4. Phones and watches
+
+**iPhone:** delete the Beltpack app. That removes the watch app with it, along
+with the stored passcode.
+
+**Android and laptops:** remove the home-screen icon, then clear the site's data
+in the browser. The web client keeps the join passcode in local storage, so a
+phone that has been handed back still holds it until you do.
+
+## 5. The tools
+
+```bash
+brew uninstall livekit livekit-cli xcodegen
+```
+
+`setup.sh` may have installed node as well. Leave node and Xcode in place unless
+you know nothing else on the Mac uses them. If you put Caddy in front, stop it
+however you started it, and remove the DNS record that points the hostname at
+this Mac.
+
+On the console, Bus 2 exists only to feed this and can go. Bus 1 is the
+Hollyland path and was never touched.
+
+---
+
 # When something is wrong
 
 **No microphone prompt, or device names are blank.** Enumerating devices never
